@@ -49,7 +49,8 @@
           ShieldAlert, Trophy, Calendar, Trash2, Plus, ArrowRight, 
           GitMerge, Layers, Sparkles, Zap, BrainCircuit, TrendingUp, 
           Activity, AlertTriangle, Coffee, BookOpen, Brush, RefreshCcw,
-          Dices, Lock, RotateCcw
+          Dices, Lock, RotateCcw, Sunrise, Sunset, Timer, LogOut, CalendarClock,
+          PieChart
         } from 'lucide-react';
 
         // --- Components ---
@@ -89,7 +90,7 @@
         function FocusContractDefinitive() {
           // --- State ---
           const [tasks, setTasks] = useState([]);
-          const [view, setView] = useState('dashboard'); 
+          const [view, setView] = useState('setup'); 
           const [activeTask, setActiveTask] = useState(null);
           const [consequenceType, setConsequenceType] = useState(null); 
           const [isRolling, setIsRolling] = useState(false); 
@@ -99,23 +100,45 @@
           const [timeLeft, setTimeLeft] = useState(25 * 60);
           const [isTimerRunning, setIsTimerRunning] = useState(false);
           const [distractionBuffer, setDistractionBuffer] = useState("");
+          const [pendingPostDuration, setPendingPostDuration] = useState(0); // Tempo reservado para a consequência (25%)
+
           const timerRef = useRef(null);
+
+          // Gestão do Tempo
+          const [dayConfig, setDayConfig] = useState({
+            status: 'idle', 
+            slots: [], 
+            totalMinutesAvailable: 0,
+            minutesUsed: 0
+          });
+          const [tempSlot, setTempSlot] = useState({ start: '', end: '' });
 
           // Load Data
           useEffect(() => {
-            const saved = localStorage.getItem('focus-contract-production-v1');
-            if (saved) {
-              setTasks(JSON.parse(saved));
-            } else {
-              setTasks([]); // Start fresh
+            const savedTasks = localStorage.getItem('focus-contract-user-data');
+            if (savedTasks) setTasks(JSON.parse(savedTasks));
+
+            const savedDay = localStorage.getItem('focus-contract-day-config');
+            if (savedDay) {
+                const parsedDay = JSON.parse(savedDay);
+                setDayConfig(parsedDay);
+                if (parsedDay.status === 'active') {
+                    setView('dashboard');
+                } else {
+                    setView('setup');
+                }
             }
           }, []);
 
           useEffect(() => {
-            localStorage.setItem('focus-contract-production-v1', JSON.stringify(tasks));
+            localStorage.setItem('focus-contract-user-data', JSON.stringify(tasks));
           }, [tasks]);
 
-          // Timer
+          useEffect(() => {
+            localStorage.setItem('focus-contract-day-config', JSON.stringify(dayConfig));
+          }, [dayConfig]);
+
+          // Timer logic
           useEffect(() => {
             if (isTimerRunning && timeLeft > 0) {
               timerRef.current = setInterval(() => {
@@ -134,33 +157,123 @@
             return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
           };
 
-          // --- Core Logic ---
+          // --- Time Management Logic ---
+
+          const addTimeSlot = () => {
+             if (!tempSlot.start || !tempSlot.end) return;
+             
+             const [startH, startM] = tempSlot.start.split(':').map(Number);
+             const [endH, endM] = tempSlot.end.split(':').map(Number);
+             
+             const startMinutes = startH * 60 + startM;
+             const endMinutes = endH * 60 + endM;
+             const duration = endMinutes - startMinutes;
+
+             if (duration <= 0) {
+                 alert("O horário final deve ser maior que o inicial.");
+                 return;
+             }
+
+             setDayConfig(prev => ({
+                 ...prev,
+                 slots: [...prev.slots, { ...tempSlot, duration, id: Date.now() }],
+                 totalMinutesAvailable: prev.totalMinutesAvailable + duration
+             }));
+             setTempSlot({ start: '', end: '' });
+          };
+
+          const removeTimeSlot = (index) => {
+             const slotToRemove = dayConfig.slots[index];
+             setDayConfig(prev => ({
+                 ...prev,
+                 slots: prev.slots.filter((_, i) => i !== index),
+                 totalMinutesAvailable: prev.totalMinutesAvailable - slotToRemove.duration
+             }));
+          };
+
+          const startDay = () => {
+             if (dayConfig.slots.length === 0) {
+                 if (!confirm("Tem certeza que quer iniciar sem definir horários? O controle de tempo será desativado.")) return;
+             }
+             setDayConfig(prev => ({ ...prev, status: 'active', minutesUsed: 0 }));
+             setView('dashboard');
+          };
+
+          const endDay = () => {
+             if (!confirm("Encerrar o dia? Tarefas pendentes continuarão na lista para amanhã.")) return;
+             
+             const updatedTasks = tasks.map(t => ({...t, slotId: null}));
+             setTasks(updatedTasks);
+
+             setDayConfig({
+                 status: 'idle',
+                 slots: [],
+                 totalMinutesAvailable: 0,
+                 minutesUsed: 0
+             });
+             setView('setup');
+          };
+
+          // --- Core Task Logic ---
 
           const handleTaskSubmit = (e) => {
             e.preventDefault();
             const form = e.target;
             const type = form.type.value;
             const category = form.category ? form.category.value : 'noble';
+            const slotId = form.slotId ? parseInt(form.slotId.value) : null;
             
+            // Lógica 75/25
+            const useSplit = form.useSplit ? form.useSplit.checked : false;
+            let duration = parseInt(form.duration?.value) || 0;
+            let postDuration = 0; // Tempo reservado para recompensa/punição
+
+            if (useSplit && category === 'noble') {
+                const totalBlock = parseInt(form.totalBlock?.value) || 0;
+                duration = Math.floor(totalBlock * 0.75); // 75% para a tarefa
+                postDuration = Math.floor(totalBlock * 0.25); // 25% para consequência
+            }
+
+            // Validação de Slot
+            if (slotId) {
+                const slot = dayConfig.slots.find(s => s.id === slotId);
+                if (slot) {
+                    const usedTime = tasks
+                        .filter(t => t.slotId === slotId)
+                        .reduce((acc, t) => acc + (t.duration || 0) + (t.postDuration || 0), 0); // Soma tarefa + 25% se houver
+                    
+                    const totalTaskTime = duration + postDuration;
+                    const remaining = slot.duration - usedTime;
+                    
+                    if (totalTaskTime > remaining) {
+                        alert(`ERRO: O horário das ${slot.start}-${slot.end} só tem ${remaining} min livres. Você tentou adicionar ${totalTaskTime} min (Tarefa + Reforço).`);
+                        return;
+                    }
+                }
+            }
+
             const newTask = {
               id: Date.now(),
               title: form.title.value,
               type: type,
               category: type === 'short' ? category : 'noble', 
               status: 'pending',
-              duration: parseInt(form.duration?.value) || 0,
+              duration: duration,
+              postDuration: postDuration, // Novo campo
               createdAt: new Date().toISOString(),
               parentId: form.parentId?.value ? parseInt(form.parentId.value) : null,
-              attempts: 0 // New field for persistence logic
+              attempts: 0,
+              slotId: slotId
             };
 
             setTasks([...tasks, newTask]);
             setIsModalOpen(false);
           };
 
-          const startTask = (task) => {
+          const startTask = (task, overrideDuration = null) => {
             setActiveTask(task);
-            setTimeLeft(task.duration * 60);
+            // Se for tarefa sorteada, usa o override (25% do tempo da tarefa anterior)
+            setTimeLeft((overrideDuration || task.duration) * 60);
             setView('focus');
             setIsTimerRunning(false);
             setDistractionBuffer("");
@@ -168,15 +281,28 @@
 
           const handleFocusEnd = (wasSuccessful) => {
             let updatedTasks = [...tasks];
+            
+            // Computa tempo usado (Tarefa Nobre + Seu tempo de reforço se tiver sido usado)
+            // Se for tarefa nobre, salvamos o tempo de reforço pendente para a próxima etapa
+            if (activeTask.category === 'noble') {
+                if (wasSuccessful) {
+                    setDayConfig(prev => ({ ...prev, minutesUsed: prev.minutesUsed + activeTask.duration }));
+                }
+                // Prepara o tempo para a próxima fase (25%)
+                setPendingPostDuration(activeTask.postDuration || 0);
+            } else {
+                // Se completou a tarefa de reforço, adiciona esse tempo ao uso do dia também
+                if (wasSuccessful && activeTask.duration) { // Aqui seria o tempo do override, mas simplificamos
+                     // Nota: O tempo do reforço já foi debitado na validação do slot, então ok.
+                }
+                setPendingPostDuration(0); // Reseta
+            }
 
             if (wasSuccessful) {
-                // SUCESSO: Marca como completa
                 updatedTasks = updatedTasks.map(t => 
                     t.id === activeTask.id ? { ...t, status: 'completed', completedAt: new Date().toISOString(), actualDuration: activeTask.duration } : t
                 );
             } else {
-                // FALHA: Incrementa tentativas, MAS MANTÉM 'PENDING'
-                // A tarefa continua na fila para ser feita novamente
                 updatedTasks = updatedTasks.map(t => 
                     t.id === activeTask.id ? { ...t, attempts: (t.attempts || 0) + 1 } : t
                 );
@@ -184,12 +310,10 @@
             
             setTasks(updatedTasks);
             
-            // Roteamento para Consequência
             if (activeTask.category === 'noble') {
                 setConsequenceType(wasSuccessful ? 'success' : 'failure');
                 setView('consequence');
             } else {
-                // Se completou uma punição ou lazer, volta pro dashboard
                 setView('dashboard');
             }
             setIsTimerRunning(false);
@@ -211,31 +335,158 @@
                  const randomIndex = Math.floor(Math.random() * pool.length);
                  const selected = pool[randomIndex];
                  setIsRolling(false);
-                 startTask(selected);
+                 
+                 // AQUI ESTÁ A MÁGICA:
+                 // Se houver tempo pendente (25%), a tarefa sorteada herda esse tempo.
+                 // Caso contrário (se a tarefa nobre não usou modelo 75/25), usa o tempo normal da tarefa sorteada.
+                 const durationToUse = pendingPostDuration > 0 ? pendingPostDuration : selected.duration;
+                 
+                 // Pequeno hack para exibir o tempo correto na tela de foco
+                 // Vamos criar um objeto temporário para não alterar o banco original permanentemente se for só um override de tempo
+                 const tempTask = { ...selected, title: `${selected.title} (${durationToUse} min)`, duration: durationToUse };
+                 
+                 startTask(tempTask, durationToUse);
              }, 1500);
           };
 
           // --- Views ---
 
+          const renderDaySetup = () => {
+              return (
+                <div className="space-y-6 animate-enter h-full flex flex-col">
+                    <header className="text-center pt-6">
+                        <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Sunrise className="w-8 h-8" />
+                        </div>
+                        <h1 className="text-2xl font-bold text-slate-900">Bom dia, Guerreiro!</h1>
+                        <p className="text-sm text-slate-500 max-w-xs mx-auto mt-2">
+                            Antes de começarmos, precisamos definir sua disponibilidade. A gestão do tempo é a chave da aprovação.
+                        </p>
+                    </header>
+
+                    <div className="flex-1 overflow-y-auto">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h2 className="text-sm font-bold uppercase text-slate-500 mb-4 flex items-center gap-2">
+                                <Clock className="w-4 h-4" /> Quanto tempo você tem hoje?
+                            </h2>
+                            
+                            <div className="flex gap-2 items-end mb-4">
+                                <div className="flex-1">
+                                    <label className="text-xs font-bold text-slate-400 block mb-1">Início</label>
+                                    <input 
+                                        type="time" 
+                                        value={tempSlot.start}
+                                        onChange={(e) => setTempSlot({...tempSlot, start: e.target.value})}
+                                        className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs font-bold text-slate-400 block mb-1">Fim</label>
+                                    <input 
+                                        type="time" 
+                                        value={tempSlot.end}
+                                        onChange={(e) => setTempSlot({...tempSlot, end: e.target.value})}
+                                        className="w-full p-2 border border-slate-300 rounded-lg text-sm"
+                                    />
+                                </div>
+                                <Button onClick={addTimeSlot} className="h-[38px] px-3">
+                                    <Plus className="w-5 h-5" />
+                                </Button>
+                            </div>
+
+                            <div className="space-y-2">
+                                {dayConfig.slots.length === 0 && (
+                                    <p className="text-xs text-slate-400 text-center py-4 italic bg-slate-50 rounded">
+                                        Nenhum horário adicionado ainda.
+                                    </p>
+                                )}
+                                {dayConfig.slots.map((slot, idx) => (
+                                    <div key={idx} className="flex justify-between items-center bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono font-bold text-indigo-700">{slot.start} - {slot.end}</span>
+                                            <span className="text-xs text-indigo-400">({slot.duration} min)</span>
+                                        </div>
+                                        <button onClick={() => removeTimeSlot(idx)} className="text-indigo-300 hover:text-red-500">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            {dayConfig.totalMinutesAvailable > 0 && (
+                                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
+                                    <span className="text-xs font-bold text-slate-500 uppercase">Total Disponível</span>
+                                    <span className="text-xl font-bold text-slate-800">
+                                        {Math.floor(dayConfig.totalMinutesAvailable / 60)}h {dayConfig.totalMinutesAvailable % 60}m
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="pb-6">
+                        <Button onClick={startDay} className="w-full py-4 text-lg shadow-xl bg-slate-900 hover:bg-slate-800">
+                            Iniciar Meu Dia <ArrowRight className="w-5 h-5 ml-1" />
+                        </Button>
+                    </div>
+                </div>
+              );
+          }
+
           const renderDashboard = () => {
-            const nobleTasks = tasks.filter(t => t.type === 'short' && t.category === 'noble' && t.status === 'pending');
+            const nobleTasks = tasks
+                .filter(t => t.type === 'short' && t.category === 'noble' && t.status === 'pending')
+                .sort((a, b) => {
+                    const slotA = dayConfig.slots.find(s => s.id === a.slotId);
+                    const slotB = dayConfig.slots.find(s => s.id === b.slotId);
+                    if (slotA && slotB) return slotA.start.localeCompare(slotB.start);
+                    if (slotA && !slotB) return -1;
+                    if (!slotA && slotB) return 1;
+                    return 0;
+                });
+
             const pleasureCount = tasks.filter(t => t.category === 'pleasure' && t.status === 'pending').length;
             const choreCount = tasks.filter(t => t.category === 'chore' && t.status === 'pending').length;
             
             const currentMission = nobleTasks.length > 0 ? nobleTasks[0] : null;
             const nextInQueue = nobleTasks.length > 1 ? nobleTasks.slice(1, 3) : [];
+            const currentMissionSlot = currentMission && currentMission.slotId ? dayConfig.slots.find(s => s.id === currentMission.slotId) : null;
+            const progressPct = dayConfig.totalMinutesAvailable > 0 ? Math.min((dayConfig.minutesUsed / dayConfig.totalMinutesAvailable) * 100, 100) : 0;
 
             return (
               <div className="space-y-6 animate-enter pb-20">
                 <header className="flex justify-between items-center">
                   <div>
                     <h1 className="text-2xl font-bold text-slate-900">FocusContract</h1>
-                    <p className="text-xs text-slate-500">Comando Central</p>
+                    <div className="flex items-center gap-1 text-xs text-slate-500">
+                        <span className={`w-2 h-2 rounded-full ${dayConfig.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                        Modo Execução Ativo
+                    </div>
                   </div>
                   <Button onClick={() => setIsModalOpen(true)} className="bg-slate-900 shadow-lg px-3 py-2">
                     <Plus className="w-4 h-4" />
                   </Button>
                 </header>
+
+                {/* Painel de Gestão do Tempo */}
+                {dayConfig.totalMinutesAvailable > 0 && (
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold uppercase text-slate-400 flex items-center gap-1">
+                                <Timer className="w-3 h-3" /> Gestão do Tempo
+                            </span>
+                            <span className="text-xs font-mono text-slate-600">
+                                {Math.floor(dayConfig.minutesUsed / 60)}h{dayConfig.minutesUsed % 60} / {Math.floor(dayConfig.totalMinutesAvailable / 60)}h{dayConfig.totalMinutesAvailable % 60}
+                            </span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                            <div 
+                                className={`h-2.5 rounded-full transition-all duration-500 ${progressPct > 90 ? 'bg-red-500' : 'bg-indigo-600'}`} 
+                                style={{ width: `${progressPct}%` }}
+                            ></div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Missão Atual */}
                 <div>
@@ -246,10 +497,9 @@
                   {currentMission ? (
                      <div className="bg-white rounded-2xl p-6 shadow-xl border-2 border-indigo-500 relative overflow-hidden">
                         <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">
-                            ORDEM DO DIA
+                            {currentMissionSlot ? `${currentMissionSlot.start} - ${currentMissionSlot.end}` : 'NA FILA'}
                         </div>
                         
-                        {/* Indicador de Tentativas (Pressão Psicológica) */}
                         {currentMission.attempts > 0 && (
                             <div className="absolute top-0 left-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-br-lg flex items-center gap-1">
                                 <RotateCcw className="w-3 h-3" /> TENTATIVA #{currentMission.attempts + 1}
@@ -257,9 +507,15 @@
                         )}
 
                         <h3 className="text-xl font-bold text-slate-800 mb-2 mt-4">{currentMission.title}</h3>
+                        
                         <div className="flex items-center gap-4 text-sm text-slate-500 mb-6">
                              <span className="flex items-center gap-1"><Clock className="w-4 h-4"/> {currentMission.duration} min</span>
                              <span className="flex items-center gap-1 text-indigo-600 font-medium"><BookOpen className="w-4 h-4"/> Estudo</span>
+                             {currentMission.postDuration > 0 && (
+                                <span className="flex items-center gap-1 text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded text-[10px]">
+                                    <PieChart className="w-3 h-3"/> +{currentMission.postDuration}m Reforço
+                                </span>
+                             )}
                         </div>
                         <Button 
                             onClick={() => startTask(currentMission)} 
@@ -283,18 +539,28 @@
                 {nextInQueue.length > 0 && (
                     <div className="opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
                         <h3 className="text-xs font-bold uppercase text-slate-400 mb-2 pl-1 flex items-center gap-2">
-                            <Lock className="w-3 h-3" /> Próximas (Bloqueadas)
+                            <Lock className="w-3 h-3" /> Próximas (Agendadas)
                         </h3>
                         <div className="space-y-2">
-                            {nextInQueue.map((t, idx) => (
-                                <div key={t.id} className="bg-white p-3 rounded-lg border border-slate-200 flex justify-between items-center text-slate-500">
-                                    <span className="text-sm font-medium truncate">{t.title}</span>
-                                    <div className="flex items-center gap-2">
-                                        {t.attempts > 0 && <span className="text-[10px] text-red-500 font-bold">Falhou {t.attempts}x</span>}
-                                        <span className="text-[10px] bg-slate-100 px-2 py-1 rounded">#{idx + 2}</span>
+                            {nextInQueue.map((t, idx) => {
+                                const slot = t.slotId ? dayConfig.slots.find(s => s.id === t.slotId) : null;
+                                return (
+                                    <div key={t.id} className="bg-white p-3 rounded-lg border border-slate-200 flex justify-between items-center text-slate-500">
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                            {slot && (
+                                                <span className="text-[10px] font-mono bg-indigo-50 text-indigo-600 px-1 rounded border border-indigo-100 whitespace-nowrap">
+                                                    {slot.start}
+                                                </span>
+                                            )}
+                                            <span className="text-sm font-medium truncate">{t.title}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {t.attempts > 0 && <span className="text-[10px] text-red-500 font-bold">Falhou {t.attempts}x</span>}
+                                            <span className="text-[10px] bg-slate-100 px-2 py-1 rounded">#{idx + 2}</span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     </div>
                 )}
@@ -310,9 +576,18 @@
                         <div className="text-[10px] uppercase font-bold text-orange-800">Manutenção</div>
                     </div>
                 </div>
+
+                {/* Botão Encerrar Dia */}
+                <div className="pt-6 mt-6 border-t border-slate-200">
+                    <Button onClick={endDay} variant="ghost" className="w-full text-red-500 hover:bg-red-50 hover:text-red-700">
+                        <LogOut className="w-4 h-4" /> Encerrar Dia e Mover Pendências
+                    </Button>
+                </div>
               </div>
             );
           };
+
+          // --- Rest of the views ---
 
           const renderTaskManager = () => {
              return (
@@ -326,15 +601,22 @@
                             <h3 className="text-xs font-bold uppercase text-slate-400 flex items-center gap-2">
                                 {type === 'long' ? 'Longo Prazo' : type === 'medium' ? 'Médio Prazo' : 'Curto Prazo'}
                             </h3>
-                            {tasks.filter(t => t.type === type && t.category === 'noble' && t.status === 'pending').map(task => (
-                                <div key={task.id} className="bg-white p-3 rounded border border-slate-200 flex justify-between items-center">
-                                    <div className="flex-1">
-                                        <p className="font-medium text-slate-800 text-sm">{task.title}</p>
-                                        {task.attempts > 0 && <p className="text-[10px] text-red-500 font-bold mt-1">Falhou {task.attempts} vezes</p>}
+                            {tasks.filter(t => t.type === type && t.category === 'noble' && t.status === 'pending').map(task => {
+                                const slot = task.slotId ? dayConfig.slots.find(s => s.id === task.slotId) : null;
+                                return (
+                                    <div key={task.id} className="bg-white p-3 rounded border border-slate-200 flex justify-between items-center">
+                                        <div className="flex-1">
+                                            <p className="font-medium text-slate-800 text-sm">
+                                                {slot && <span className="text-indigo-600 font-mono text-xs mr-2">[{slot.start}-{slot.end}]</span>}
+                                                {task.title}
+                                            </p>
+                                            {task.postDuration > 0 && <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1 rounded ml-1">75/25</span>}
+                                            {task.attempts > 0 && <p className="text-[10px] text-red-500 font-bold mt-1">Falhou {task.attempts} vezes</p>}
+                                        </div>
+                                        <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 p-2"><Trash2 className="w-4 h-4" /></button>
                                     </div>
-                                    <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 p-2"><Trash2 className="w-4 h-4" /></button>
-                                </div>
-                            ))}
+                                )
+                            })}
                             {tasks.filter(t => t.type === type && t.category === 'noble').length === 0 && (
                                 <div className="p-4 border border-dashed border-slate-300 rounded text-center text-slate-400 text-xs">
                                     Lista vazia.
@@ -428,11 +710,17 @@
                         {isRolling ? 'Sorteando...' : (isSuccess ? 'Hora da Recompensa' : 'Hora de Pagar')}
                     </h2>
                     
-                    <p className={`text-sm mb-8 max-w-xs ${isSuccess ? 'text-emerald-700' : 'text-orange-800'}`}>
+                    <p className={`text-sm mb-2 max-w-xs ${isSuccess ? 'text-emerald-700' : 'text-orange-800'}`}>
                         {isSuccess 
                             ? 'O sistema vai escolher uma atividade do seu banco de lazer.' 
                             : 'O sistema vai definir sua tarefa de manutenção.'}
                     </p>
+
+                    {pendingPostDuration > 0 && (
+                        <div className={`mb-6 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full ${isSuccess ? 'bg-emerald-200 text-emerald-800' : 'bg-orange-200 text-orange-800'}`}>
+                            Tempo Travado: {pendingPostDuration} min
+                        </div>
+                    )}
 
                     <Button 
                         onClick={() => rollTask(category)} 
@@ -453,6 +741,36 @@
 
           const renderModal = () => {
             if (!isModalOpen) return null;
+
+            // Helper para calcular tempo restante do slot
+            const getSlotInfo = (slot) => {
+                const used = tasks
+                    .filter(t => t.slotId === slot.id)
+                    .reduce((acc, t) => acc + (t.duration || 0) + (t.postDuration || 0), 0);
+                const remaining = slot.duration - used;
+                return { used, remaining };
+            };
+
+            const toggleSplit = () => {
+                const check = document.getElementById('useSplit');
+                const durationField = document.getElementById('durationField');
+                const totalField = document.getElementById('totalBlockField');
+                
+                if (check.checked) {
+                    durationField.style.display = 'none';
+                    totalField.style.display = 'block';
+                } else {
+                    durationField.style.display = 'block';
+                    totalField.style.display = 'none';
+                }
+            };
+
+            const calcSplitDisplay = (e) => {
+                const total = parseInt(e.target.value) || 0;
+                const study = Math.floor(total * 0.75);
+                const reward = Math.floor(total * 0.25);
+                document.getElementById('splitPreview').innerText = `Foco: ${study}m | Reforço: ${reward}m`;
+            };
 
             return (
               <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-enter">
@@ -501,22 +819,69 @@
 
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Título</label>
-                            <input name="title" autoFocus required placeholder="Ex: Ler PDF 01, Lavar Carro, Ver Série..." className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 outline-none transition-all" />
+                            <input name="title" autoFocus required placeholder="Ex: Ler PDF 01, Lavar Carro..." className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 outline-none transition-all" />
                         </div>
 
                         <div id="category-section" className="space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Categoria (Para Tarefas do Dia)</label>
-                                <select name="category" className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-slate-900 outline-none">
-                                    <option value="noble">🏆 Nobre (Estudo, Trabalho, Meta Principal)</option>
-                                    <option value="pleasure">🎉 Lazer (Recompensa, Descanso, Hobby)</option>
-                                    <option value="chore">🧹 Manutenção (Obrigação, Limpeza, Punição)</option>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Categoria</label>
+                                <select 
+                                    name="category" 
+                                    className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-slate-900 outline-none"
+                                    onChange={(e) => {
+                                        const el = document.getElementById('noble-options');
+                                        if (e.target.value === 'noble') el.style.display = 'block';
+                                        else el.style.display = 'none';
+                                    }}
+                                >
+                                    <option value="noble">🏆 Nobre (Estudo, Trabalho)</option>
+                                    <option value="pleasure">🎉 Lazer (Recompensa)</option>
+                                    <option value="chore">🧹 Manutenção (Obrigação)</option>
                                 </select>
                             </div>
                             
-                            <div>
-                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Duração (Min)</label>
+                            {/* OPÇÕES NOBRES - MODELO 75/25 */}
+                            <div id="noble-options" className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" name="useSplit" id="useSplit" className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" onChange={toggleSplit} />
+                                    <span className="text-sm font-bold text-indigo-800">Usar Modelo 75/25 (Pareto)</span>
+                                </label>
+                                <p className="text-[10px] text-indigo-600 mt-1 ml-6">
+                                    Divide o tempo total: 75% Foco, 25% Reforço.
+                                </p>
+                            </div>
+
+                            {dayConfig.slots.length > 0 && (
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Alocação de Tempo (Opcional)</label>
+                                    <select name="slotId" className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-slate-900 outline-none text-sm font-mono text-slate-700">
+                                        <option value="">-- Sem horário fixo --</option>
+                                        {dayConfig.slots.map(slot => {
+                                            const { remaining } = getSlotInfo(slot);
+                                            const isDisabled = remaining <= 0;
+                                            return (
+                                                <option key={slot.id} value={slot.id} disabled={isDisabled} className={isDisabled ? 'text-slate-300 bg-slate-50' : ''}>
+                                                    {slot.start} - {slot.end} (Livre: {remaining}m)
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Campo Duração Simples */}
+                            <div id="durationField">
+                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Duração da Tarefa (Min)</label>
                                <input name="duration" type="number" defaultValue="30" className="w-full p-3 border border-slate-300 rounded-lg" />
+                            </div>
+
+                            {/* Campo Tempo Total (Escondido por padrão) */}
+                            <div id="totalBlockField" style={{display: 'none'}}>
+                               <label className="block text-xs font-bold text-indigo-600 uppercase mb-1">Tempo Total do Bloco (Min)</label>
+                               <input name="totalBlock" type="number" defaultValue="60" className="w-full p-3 border border-indigo-300 rounded-lg bg-white" onChange={calcSplitDisplay} />
+                               <p id="splitPreview" className="text-xs text-indigo-500 mt-2 font-mono text-center bg-white/50 p-1 rounded">
+                                   Foco: 45m | Reforço: 15m
+                               </p>
                             </div>
                         </div>
 
@@ -534,6 +899,7 @@
             <div className="w-full max-w-md h-[850px] bg-white rounded-2xl shadow-2xl overflow-hidden relative border-4 border-slate-900 flex flex-col">
               
               <div className="flex-1 overflow-y-auto p-6 scrollbar-hide bg-slate-50/50">
+                  {view === 'setup' && renderDaySetup()}
                   {view === 'dashboard' && renderDashboard()}
                   {view === 'tasks' && renderTaskManager()}
                   {view === 'analytics' && renderAnalytics()}
@@ -541,7 +907,7 @@
                   {view === 'consequence' && renderConsequenceSelection()}
               </div>
 
-              {view !== 'focus' && view !== 'consequence' && (
+              {view !== 'focus' && view !== 'consequence' && view !== 'setup' && (
                   <div className="bg-white border-t border-slate-200 p-3 grid grid-cols-4 gap-2">
                       <button onClick={() => setView('dashboard')} className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${view === 'dashboard' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
                           <Target className="w-5 h-5 mb-1" />
