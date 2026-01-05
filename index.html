@@ -1,658 +1,689 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Play, 
-  CheckCircle, 
-  XCircle, 
-  Target, 
-  Clock, 
-  BarChart2, 
-  ShieldAlert, 
-  Trophy,
-  Calendar,
-  Trash2,
-  Plus,
-  ArrowRight,
-  GitMerge,
-  Layers,
-  Sparkles,
-  Zap,
-  BrainCircuit,
-  TrendingUp,
-  Activity,
-  AlertTriangle
-} from 'lucide-react';
-
-// --- Components ---
-
-const Card = ({ children, className = "", onClick }) => (
-  <div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className} ${onClick ? 'cursor-pointer hover:border-slate-400' : ''}`}>
-    {children}
-  </div>
-);
-
-const Button = ({ onClick, children, variant = "primary", className = "", disabled = false, type="button" }) => {
-  const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2";
-  const variants = {
-    primary: "bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300",
-    secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50",
-    danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200",
-    success: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200",
-    ghost: "text-slate-500 hover:bg-slate-100 border-transparent",
-    accent: "bg-indigo-600 text-white hover:bg-indigo-700 border-transparent"
-  };
-  
-  return (
-    <button 
-      type={type}
-      onClick={onClick} 
-      disabled={disabled}
-      className={`${baseStyle} ${variants[variant]} ${className}`}
-    >
-      {children}
-    </button>
-  );
-};
-
-const Badge = ({ children, type }) => {
-  const styles = {
-    long: "bg-purple-100 text-purple-700 border-purple-200",
-    medium: "bg-blue-100 text-blue-700 border-blue-200",
-    short: "bg-amber-100 text-amber-700 border-amber-200"
-  };
-  return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${styles[type] || styles.short}`}>
-      {children}
-    </span>
-  );
-};
-
-// --- Main Application ---
-
-export default function FocusContractDefinitive() {
-  // --- State ---
-  const [tasks, setTasks] = useState([]);
-  const [view, setView] = useState('dashboard'); // dashboard, tasks, focus, analytics
-  const [activeTask, setActiveTask] = useState(null);
-  
-  // Modal States
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [suggestionFlow, setSuggestionFlow] = useState(null); 
-  
-  // Timer & Focus States
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [distractionBuffer, setDistractionBuffer] = useState("");
-  const timerRef = useRef(null);
-
-  // Load from LocalStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('focus-contract-final');
-    if (saved) {
-      setTasks(JSON.parse(saved));
-    } else {
-      // Seed Data: Exemplo de Concurseiro
-      setTasks([
-        { id: 1, title: 'Aprovação Auditor Fiscal', type: 'long', status: 'pending', reward: 'Viagem Europa', penalty: 'Continuar no CLT', parentId: null, createdAt: new Date().toISOString() },
-        { id: 2, title: 'Fechar Direito Tributário', type: 'medium', status: 'pending', reward: 'Jantar Japonês', penalty: 'Sem Netflix fds', parentId: 1, createdAt: new Date().toISOString() },
-        { id: 3, title: 'Aula 01: Sistema Tributário', type: 'short', status: 'pending', reward: 'Café Premium', penalty: 'Lavar Banheiro', duration: 90, parentId: 2, createdAt: new Date().toISOString() }
-      ]);
-    }
-  }, []);
-
-  // Save to LocalStorage
-  useEffect(() => {
-    localStorage.setItem('focus-contract-final', JSON.stringify(tasks));
-  }, [tasks]);
-
-  // Timer Logic
-  useEffect(() => {
-    if (isTimerRunning && timeLeft > 0) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      setIsTimerRunning(false);
-      clearInterval(timerRef.current);
-    }
-    return () => clearInterval(timerRef.current);
-  }, [isTimerRunning, timeLeft]);
-
-  // Format Time
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // --- Logic for Suggestions & Hierarchy ---
-
-  const generateBreakdown = (parentTitle, type) => {
-    if (type === 'medium') {
-      return [
-        { title: `Fechar Teoria de ${parentTitle}`, reward: "Livro Novo", penalty: "Doar R$50" },
-        { title: `Bateria de 500 Questões - ${parentTitle}`, reward: "Cinema", penalty: "Faxina Pesada" }
-      ];
-    }
-    if (type === 'short') {
-      return [
-        { title: `Leitura PDF: ${parentTitle} (P1)`, duration: 50, reward: "15min Redes Sociais", penalty: "Sem café amanhã" },
-        { title: `Resumo + Flashcards: ${parentTitle}`, duration: 30, reward: "Episódio Série", penalty: "Lavar Louça" }
-      ];
-    }
-    return [];
-  };
-
-  const handleTaskSubmit = (e) => {
-    e.preventDefault();
-    const form = e.target;
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FocusContract - App do Concurseiro</title>
     
-    const newTask = {
-      id: Date.now(),
-      title: form.title.value,
-      type: form.type.value,
-      status: 'pending',
-      reward: form.reward.value,
-      penalty: form.penalty.value,
-      duration: parseInt(form.duration?.value) || 0,
-      createdAt: new Date().toISOString(),
-      parentId: form.parentId?.value ? parseInt(form.parentId.value) : null
-    };
-
-    setTasks([...tasks, newTask]);
+    <!-- 1. Tailwind CSS para o estilo -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
-    if (newTask.type === 'long') {
-      setSuggestionFlow({ parentId: newTask.id, parentTitle: newTask.title, nextType: 'medium' });
-    } else if (newTask.type === 'medium') {
-      setSuggestionFlow({ parentId: newTask.id, parentTitle: newTask.title, nextType: 'short' });
-    } else {
-      setIsModalOpen(false);
-      setSuggestionFlow(null);
+    <!-- 2. Configuração de Imports (Isso permite usar 'import' no navegador) -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0"
+      }
     }
-  };
-
-  const handleSuggestionAccept = (suggestions) => {
-    const newTasks = suggestions.map((s, idx) => ({
-      id: Date.now() + idx,
-      title: s.title,
-      type: suggestionFlow.nextType,
-      status: 'pending',
-      reward: s.reward,
-      penalty: s.penalty,
-      duration: s.duration || 0,
-      parentId: suggestionFlow.parentId,
-      createdAt: new Date().toISOString()
-    }));
-    setTasks(prev => [...prev, ...newTasks]);
-    setIsModalOpen(false);
-    setSuggestionFlow(null);
-  };
-
-  const completeActiveTask = () => {
-      const updated = tasks.map(t => 
-          t.id === activeTask.id ? {
-              ...t, 
-              status: 'completed', 
-              completedAt: new Date().toISOString(),
-              actualDuration: activeTask.duration // Armazena duração planejada como realizada para simplificar
-          } : t
-      );
-      setTasks(updated);
-      setDistractionBuffer(""); // Limpa o buffer mental
-      setView('dashboard');
-  };
-
-  // --- Helpers for Analytics ---
-  
-  const getWeeklyData = () => {
-    const last7Days = Array.from({length: 7}, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        return d.toISOString().split('T')[0];
-    }).reverse();
-
-    return last7Days.map(date => {
-        const minutes = tasks
-            .filter(t => t.status === 'completed' && t.completedAt && t.completedAt.startsWith(date))
-            .reduce((acc, curr) => acc + (curr.duration || 0), 0);
-        return { date, minutes };
-    });
-  };
-
-  // --- Views ---
-
-  const renderDashboard = () => {
-    const shorts = tasks.filter(t => t.type === 'short' && t.status === 'pending');
-    const longs = tasks.filter(t => t.type === 'long' && t.status === 'pending');
-    const totalCompleted = tasks.filter(t => t.status === 'completed').length;
+    </script>
     
-    return (
-      <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-        <header className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">FocusContract</h1>
-            <div className="flex items-center gap-2 text-slate-500 text-xs mt-1">
-                <Activity className="w-3 h-3 text-emerald-500" />
-                <span>{totalCompleted} contratos cumpridos</span>
-            </div>
+    <!-- 3. Babel para traduzir o JSX para o navegador -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Estilos extras para scrollbar e animações -->
+    <style>
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center font-sans text-slate-900">
+    
+    <!-- Onde o React vai montar o app -->
+    <div id="root" class="w-full h-full flex justify-center p-4"></div>
+
+    <!-- 4. Seu Código do App -->
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { 
+          Play, CheckCircle, XCircle, Target, Clock, BarChart2, 
+          ShieldAlert, Trophy, Calendar, Trash2, Plus, ArrowRight, 
+          GitMerge, Layers, Sparkles, Zap, BrainCircuit, TrendingUp, 
+          Activity, AlertTriangle 
+        } from 'lucide-react';
+
+        // --- Components ---
+
+        const Card = ({ children, className = "", onClick }) => (
+          <div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className} ${onClick ? 'cursor-pointer hover:border-slate-400' : ''}`}>
+            {children}
           </div>
-          <Button onClick={() => setIsModalOpen(true)} className="bg-slate-900 shadow-lg">
-            <Plus className="w-4 h-4" /> Novo
-          </Button>
-        </header>
+        );
 
-        {/* Priority Block */}
-        <div className="bg-slate-900 rounded-xl p-6 text-white shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Target className="w-32 h-32" />
-          </div>
+        const Button = ({ onClick, children, variant = "primary", className = "", disabled = false, type="button" }) => {
+          const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2";
+          const variants = {
+            primary: "bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300",
+            secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50",
+            danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200",
+            success: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200",
+            ghost: "text-slate-500 hover:bg-slate-100 border-transparent",
+            accent: "bg-indigo-600 text-white hover:bg-indigo-700 border-transparent"
+          };
           
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
-            <Target className="w-4 h-4" /> Objetivo Imediato
-          </h2>
+          return (
+            <button 
+              type={type}
+              onClick={onClick} 
+              disabled={disabled}
+              className={`${baseStyle} ${variants[variant]} ${className}`}
+            >
+              {children}
+            </button>
+          );
+        };
 
-          {shorts.length > 0 ? (
-            <div>
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold leading-tight">{shorts[0].title}</h3>
-                {shorts[0].parentId && (
-                  <div className="flex items-center gap-2 mt-2 text-slate-400 text-xs">
-                     <GitMerge className="w-3 h-3" />
-                     <span>Parte de: {tasks.find(t => t.id === shorts[0].parentId)?.title}</span>
+        const Badge = ({ children, type }) => {
+          const styles = {
+            long: "bg-purple-100 text-purple-700 border-purple-200",
+            medium: "bg-blue-100 text-blue-700 border-blue-200",
+            short: "bg-amber-100 text-amber-700 border-amber-200"
+          };
+          return (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${styles[type] || styles.short}`}>
+              {children}
+            </span>
+          );
+        };
+
+        // --- Main Application ---
+
+        function FocusContractDefinitive() {
+          // --- State ---
+          const [tasks, setTasks] = useState([]);
+          const [view, setView] = useState('dashboard'); // dashboard, tasks, focus, analytics
+          const [activeTask, setActiveTask] = useState(null);
+          
+          // Modal States
+          const [isModalOpen, setIsModalOpen] = useState(false);
+          const [suggestionFlow, setSuggestionFlow] = useState(null); 
+          
+          // Timer & Focus States
+          const [timeLeft, setTimeLeft] = useState(25 * 60);
+          const [isTimerRunning, setIsTimerRunning] = useState(false);
+          const [distractionBuffer, setDistractionBuffer] = useState("");
+          const timerRef = useRef(null);
+
+          // Load from LocalStorage
+          useEffect(() => {
+            const saved = localStorage.getItem('focus-contract-final');
+            if (saved) {
+              setTasks(JSON.parse(saved));
+            } else {
+              // Seed Data: Exemplo de Concurseiro
+              setTasks([
+                { id: 1, title: 'Aprovação Auditor Fiscal', type: 'long', status: 'pending', reward: 'Viagem Europa', penalty: 'Continuar no CLT', parentId: null, createdAt: new Date().toISOString() },
+                { id: 2, title: 'Fechar Direito Tributário', type: 'medium', status: 'pending', reward: 'Jantar Japonês', penalty: 'Sem Netflix fds', parentId: 1, createdAt: new Date().toISOString() },
+                { id: 3, title: 'Aula 01: Sistema Tributário', type: 'short', status: 'pending', reward: 'Café Premium', penalty: 'Lavar Banheiro', duration: 90, parentId: 2, createdAt: new Date().toISOString() }
+              ]);
+            }
+          }, []);
+
+          // Save to LocalStorage
+          useEffect(() => {
+            localStorage.setItem('focus-contract-final', JSON.stringify(tasks));
+          }, [tasks]);
+
+          // Timer Logic
+          useEffect(() => {
+            if (isTimerRunning && timeLeft > 0) {
+              timerRef.current = setInterval(() => {
+                setTimeLeft((prev) => prev - 1);
+              }, 1000);
+            } else if (timeLeft === 0) {
+              setIsTimerRunning(false);
+              clearInterval(timerRef.current);
+            }
+            return () => clearInterval(timerRef.current);
+          }, [isTimerRunning, timeLeft]);
+
+          // Format Time
+          const formatTime = (seconds) => {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+          };
+
+          // --- Logic for Suggestions & Hierarchy ---
+
+          const generateBreakdown = (parentTitle, type) => {
+            if (type === 'medium') {
+              return [
+                { title: `Fechar Teoria de ${parentTitle}`, reward: "Livro Novo", penalty: "Doar R$50" },
+                { title: `Bateria de 500 Questões - ${parentTitle}`, reward: "Cinema", penalty: "Faxina Pesada" }
+              ];
+            }
+            if (type === 'short') {
+              return [
+                { title: `Leitura PDF: ${parentTitle} (P1)`, duration: 50, reward: "15min Redes Sociais", penalty: "Sem café amanhã" },
+                { title: `Resumo + Flashcards: ${parentTitle}`, duration: 30, reward: "Episódio Série", penalty: "Lavar Louça" }
+              ];
+            }
+            return [];
+          };
+
+          const handleTaskSubmit = (e) => {
+            e.preventDefault();
+            const form = e.target;
+            
+            const newTask = {
+              id: Date.now(),
+              title: form.title.value,
+              type: form.type.value,
+              status: 'pending',
+              reward: form.reward.value,
+              penalty: form.penalty.value,
+              duration: parseInt(form.duration?.value) || 0,
+              createdAt: new Date().toISOString(),
+              parentId: form.parentId?.value ? parseInt(form.parentId.value) : null
+            };
+
+            setTasks([...tasks, newTask]);
+            
+            if (newTask.type === 'long') {
+              setSuggestionFlow({ parentId: newTask.id, parentTitle: newTask.title, nextType: 'medium' });
+            } else if (newTask.type === 'medium') {
+              setSuggestionFlow({ parentId: newTask.id, parentTitle: newTask.title, nextType: 'short' });
+            } else {
+              setIsModalOpen(false);
+              setSuggestionFlow(null);
+            }
+          };
+
+          const handleSuggestionAccept = (suggestions) => {
+            const newTasks = suggestions.map((s, idx) => ({
+              id: Date.now() + idx,
+              title: s.title,
+              type: suggestionFlow.nextType,
+              status: 'pending',
+              reward: s.reward,
+              penalty: s.penalty,
+              duration: s.duration || 0,
+              parentId: suggestionFlow.parentId,
+              createdAt: new Date().toISOString()
+            }));
+            setTasks(prev => [...prev, ...newTasks]);
+            setIsModalOpen(false);
+            setSuggestionFlow(null);
+          };
+
+          const completeActiveTask = () => {
+              const updated = tasks.map(t => 
+                  t.id === activeTask.id ? {
+                      ...t, 
+                      status: 'completed', 
+                      completedAt: new Date().toISOString(),
+                      actualDuration: activeTask.duration // Armazena duração planejada como realizada para simplificar
+                  } : t
+              );
+              setTasks(updated);
+              setDistractionBuffer(""); // Limpa o buffer mental
+              setView('dashboard');
+          };
+
+          // --- Helpers for Analytics ---
+          
+          const getWeeklyData = () => {
+            const last7Days = Array.from({length: 7}, (_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                return d.toISOString().split('T')[0];
+            }).reverse();
+
+            return last7Days.map(date => {
+                const minutes = tasks
+                    .filter(t => t.status === 'completed' && t.completedAt && t.completedAt.startsWith(date))
+                    .reduce((acc, curr) => acc + (curr.duration || 0), 0);
+                return { date, minutes };
+            });
+          };
+
+          // --- Views ---
+
+          const renderDashboard = () => {
+            const shorts = tasks.filter(t => t.type === 'short' && t.status === 'pending');
+            const longs = tasks.filter(t => t.type === 'long' && t.status === 'pending');
+            const totalCompleted = tasks.filter(t => t.status === 'completed').length;
+            
+            return (
+              <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+                <header className="flex justify-between items-center">
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-900">FocusContract</h1>
+                    <div className="flex items-center gap-2 text-slate-500 text-xs mt-1">
+                        <Activity className="w-3 h-3 text-emerald-500" />
+                        <span>{totalCompleted} contratos cumpridos</span>
+                    </div>
                   </div>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
-                  <span className="text-emerald-400 text-xs font-bold uppercase flex items-center gap-1 mb-1">
-                    <Trophy className="w-3 h-3"/> Ganho
-                  </span>
-                  <p className="text-sm text-slate-200 leading-tight">{shorts[0].reward}</p>
-                </div>
-                <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
-                  <span className="text-red-400 text-xs font-bold uppercase flex items-center gap-1 mb-1">
-                    <ShieldAlert className="w-3 h-3"/> Risco
-                  </span>
-                  <p className="text-sm text-slate-200 leading-tight">{shorts[0].penalty}</p>
-                </div>
-              </div>
+                  <Button onClick={() => setIsModalOpen(true)} className="bg-slate-900 shadow-lg">
+                    <Plus className="w-4 h-4" /> Novo
+                  </Button>
+                </header>
 
-              <Button onClick={() => { setActiveTask(shorts[0]); setTimeLeft(shorts[0].duration * 60); setView('focus'); }} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white border-none py-3">
-                <Play className="w-4 h-4 fill-current" /> Executar ({(shorts[0].duration || 30)} min)
-              </Button>
-            </div>
-          ) : (
-             <div className="text-center py-6">
-                <p className="text-slate-300 mb-4">Você está livre de pendências imediatas.</p>
-                <Button variant="secondary" onClick={() => setView('tasks')} className="mx-auto w-fit bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
-                  Ver Planejamento Global
-                </Button>
-             </div>
-          )}
-        </div>
-
-        {/* Tree Overview */}
-        <div>
-          <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-            <Layers className="w-4 h-4" /> Visão Macro
-          </h3>
-          <div className="space-y-4">
-            {longs.length === 0 && <p className="text-sm text-slate-500 italic">Nenhum objetivo de longo prazo definido.</p>}
-            {longs.map(long => {
-              const mediums = tasks.filter(t => t.parentId === long.id);
-              const progress = Math.round((mediums.filter(m => m.status === 'completed').length / (mediums.length || 1)) * 100);
-              
-              return (
-                <Card key={long.id} className="p-4 border-l-4 border-l-purple-500">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-bold text-slate-800">{long.title}</h4>
-                    <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">{progress}%</span>
+                {/* Priority Block */}
+                <div className="bg-slate-900 rounded-xl p-6 text-white shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Target className="w-32 h-32" />
                   </div>
                   
-                  {mediums.length > 0 ? (
-                    <div className="space-y-2 mt-3 pl-3 border-l-2 border-slate-100">
-                      {mediums.map(med => {
-                        const shortTasks = tasks.filter(s => s.parentId === med.id);
-                        const pendingShorts = shortTasks.filter(s => s.status === 'pending').length;
-                        return (
-                          <div key={med.id} className="text-sm">
-                            <div className="flex justify-between items-center">
-                               <span className={`${med.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                                 {med.title}
-                               </span>
-                               {pendingShorts > 0 && <Badge type="short">{pendingShorts} ações</Badge>}
-                            </div>
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
+                    <Target className="w-4 h-4" /> Objetivo Imediato
+                  </h2>
+
+                  {shorts.length > 0 ? (
+                    <div>
+                      <div className="mb-6">
+                        <h3 className="text-2xl font-bold leading-tight">{shorts[0].title}</h3>
+                        {shorts[0].parentId && (
+                          <div className="flex items-center gap-2 mt-2 text-slate-400 text-xs">
+                             <GitMerge className="w-3 h-3" />
+                             <span>Parte de: {tasks.find(t => t.id === shorts[0].parentId)?.title}</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="mt-2">
-                      <Button 
-                        variant="ghost" 
-                        className="text-xs h-8 w-full justify-start pl-0 text-indigo-600 hover:bg-indigo-50"
-                        onClick={() => {
-                          setSuggestionFlow({ parentId: long.id, parentTitle: long.title, nextType: 'medium' });
-                          setIsModalOpen(true);
-                        }}
-                      >
-                        <Plus className="w-3 h-3" /> Criar plano de médio prazo
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 mb-6">
+                        <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
+                          <span className="text-emerald-400 text-xs font-bold uppercase flex items-center gap-1 mb-1">
+                            <Trophy className="w-3 h-3"/> Ganho
+                          </span>
+                          <p className="text-sm text-slate-200 leading-tight">{shorts[0].reward}</p>
+                        </div>
+                        <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
+                          <span className="text-red-400 text-xs font-bold uppercase flex items-center gap-1 mb-1">
+                            <ShieldAlert className="w-3 h-3"/> Risco
+                          </span>
+                          <p className="text-sm text-slate-200 leading-tight">{shorts[0].penalty}</p>
+                        </div>
+                      </div>
+
+                      <Button onClick={() => { setActiveTask(shorts[0]); setTimeLeft(shorts[0].duration * 60); setView('focus'); }} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white border-none py-3">
+                        <Play className="w-4 h-4 fill-current" /> Executar ({(shorts[0].duration || 30)} min)
                       </Button>
                     </div>
+                  ) : (
+                     <div className="text-center py-6">
+                        <p className="text-slate-300 mb-4">Você está livre de pendências imediatas.</p>
+                        <Button variant="secondary" onClick={() => setView('tasks')} className="mx-auto w-fit bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
+                          Ver Planejamento Global
+                        </Button>
+                     </div>
                   )}
-                </Card>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const renderFocus = () => {
-    if (!activeTask) return null;
-    const progress = ((activeTask.duration * 60 - timeLeft) / (activeTask.duration * 60)) * 100;
-    
-    return (
-      <div className="h-full flex flex-col bg-slate-900 text-white p-6 -m-6 sm:m-0 rounded-none sm:rounded-xl relative">
-        <button onClick={() => setView('dashboard')} className="absolute top-6 left-6 text-slate-500 hover:text-white">
-            &larr; Abortar
-        </button>
-        
-        <div className="flex-1 flex flex-col items-center justify-start mt-12">
-            <h2 className="text-xl font-bold text-center mb-1">{activeTask.title}</h2>
-            {activeTask.parentId && (
-                <p className="text-slate-500 text-xs mb-8">
-                   Etapa para: {tasks.find(t => t.id === activeTask.parentId)?.title}
-                </p>
-            )}
-
-            <div className="text-8xl font-mono font-light tracking-tighter mb-8 tabular-nums">
-                {formatTime(timeLeft)}
-            </div>
-
-            <Button 
-                onClick={() => setIsTimerRunning(!isTimerRunning)} 
-                className={`w-48 py-4 text-xl rounded-full transition-all duration-300 ${
-                   isTimerRunning ? 'bg-amber-500 hover:bg-amber-600 scale-100' : 'bg-emerald-500 hover:bg-emerald-600 hover:scale-105'
-                } border-none shadow-[0_0_40px_-10px_rgba(16,185,129,0.5)]`}
-            >
-                {isTimerRunning ? 'Pausar' : 'Focar'}
-            </Button>
-
-            {/* Distraction Buffer - Feature Analítica */}
-            <div className="w-full max-w-xs mt-10">
-                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase mb-2">
-                    <BrainCircuit className="w-4 h-4" /> Buffer Mental
-                </label>
-                <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2">
-                    <textarea 
-                        value={distractionBuffer}
-                        onChange={(e) => setDistractionBuffer(e.target.value)}
-                        placeholder="Pensou em algo? Anote aqui e tire da cabeça. Não saia da tela."
-                        className="w-full bg-transparent text-sm text-slate-300 placeholder:text-slate-600 focus:outline-none resize-none h-20"
-                    />
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1 text-center">Tire a pendência da mente, coloque no buffer e foque.</p>
-            </div>
-        </div>
-        
-        {timeLeft < (activeTask.duration * 60) && (
-            <div className="mt-auto mb-6 flex justify-center gap-4">
-                <button onClick={completeActiveTask} className="text-emerald-500 hover:text-emerald-400 text-sm font-bold uppercase tracking-wider flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5" /> Concluir Contrato
-                </button>
-            </div>
-        )}
-      </div>
-    );
-  };
 
-  const renderAnalytics = () => {
-    const weeklyData = getWeeklyData();
-    const maxMinutes = Math.max(...weeklyData.map(d => d.minutes), 60); // escala mínima de 60
-    
-    // Cálculo de horas totais
-    const totalMinutes = tasks.filter(t => t.status === 'completed').reduce((acc, t) => acc + (t.duration || 0), 0);
-    const totalHours = (totalMinutes / 60).toFixed(1);
-
-    return (
-        <div className="space-y-6 pb-20 animate-in fade-in slide-in-from-right-4">
-             <header className="flex items-center gap-2">
-                <button onClick={() => setView('dashboard')} className="text-sm text-slate-500 hover:text-slate-800">&larr; Voltar</button>
-                <h2 className="font-bold text-slate-800">Auditoria de Resultados</h2>
-            </header>
-
-            <div className="grid grid-cols-2 gap-4">
-                <Card className="p-4 bg-slate-900 text-white border-none">
-                    <div className="text-xs text-slate-400 uppercase font-bold mb-1">Horas Líquidas</div>
-                    <div className="text-3xl font-mono">{totalHours}h</div>
-                    <div className="text-[10px] text-slate-500 mt-1">Acumulado Total</div>
-                </Card>
-                <Card className="p-4">
-                    <div className="text-xs text-slate-500 uppercase font-bold mb-1">Contratos</div>
-                    <div className="text-3xl font-mono text-emerald-600">
-                        {tasks.filter(t => t.status === 'completed').length}
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-1">Executados com sucesso</div>
-                </Card>
-            </div>
-
-            <Card className="p-6">
-                <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2">
-                    <BarChart2 className="w-4 h-4 text-indigo-500" />
-                    Produtividade (Últimos 7 dias)
-                </h3>
-                
-                <div className="flex items-end justify-between h-40 gap-2">
-                    {weeklyData.map((d, i) => {
-                        const heightPct = (d.minutes / maxMinutes) * 100;
-                        const isToday = i === 6;
-                        return (
-                            <div key={d.date} className="flex-1 flex flex-col items-center group">
-                                <div className="relative w-full flex items-end justify-center h-full bg-slate-50 rounded-t overflow-hidden">
-                                    <div 
-                                        style={{ height: `${heightPct}%` }} 
-                                        className={`w-full ${isToday ? 'bg-indigo-500' : 'bg-slate-300'} transition-all duration-500 group-hover:bg-indigo-400`}
-                                    ></div>
-                                </div>
-                                <div className="text-[10px] text-slate-500 mt-2 font-mono">
-                                    {d.date.split('-')[2]}
-                                </div>
+                {/* Tree Overview */}
+                <div>
+                  <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <Layers className="w-4 h-4" /> Visão Macro
+                  </h3>
+                  <div className="space-y-4">
+                    {longs.length === 0 && <p className="text-sm text-slate-500 italic">Nenhum objetivo de longo prazo definido.</p>}
+                    {longs.map(long => {
+                      const mediums = tasks.filter(t => t.parentId === long.id);
+                      const progress = Math.round((mediums.filter(m => m.status === 'completed').length / (mediums.length || 1)) * 100);
+                      
+                      return (
+                        <Card key={long.id} className="p-4 border-l-4 border-l-purple-500">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-bold text-slate-800">{long.title}</h4>
+                            <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">{progress}%</span>
+                          </div>
+                          
+                          {mediums.length > 0 ? (
+                            <div className="space-y-2 mt-3 pl-3 border-l-2 border-slate-100">
+                              {mediums.map(med => {
+                                const shortTasks = tasks.filter(s => s.parentId === med.id);
+                                const pendingShorts = shortTasks.filter(s => s.status === 'pending').length;
+                                return (
+                                  <div key={med.id} className="text-sm">
+                                    <div className="flex justify-between items-center">
+                                       <span className={`${med.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                                         {med.title}
+                                       </span>
+                                       {pendingShorts > 0 && <Badge type="short">{pendingShorts} ações</Badge>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
-                        )
+                          ) : (
+                            <div className="mt-2">
+                              <Button 
+                                variant="ghost" 
+                                className="text-xs h-8 w-full justify-start pl-0 text-indigo-600 hover:bg-indigo-50"
+                                onClick={() => {
+                                  setSuggestionFlow({ parentId: long.id, parentTitle: long.title, nextType: 'medium' });
+                                  setIsModalOpen(true);
+                                }}
+                              >
+                                <Plus className="w-3 h-3" /> Criar plano de médio prazo
+                              </Button>
+                            </div>
+                          )}
+                        </Card>
+                      );
                     })}
+                  </div>
                 </div>
-            </Card>
+              </div>
+            );
+          };
 
-            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-                <h4 className="text-amber-800 font-bold text-sm mb-2 flex items-center gap-2">
-                    <Zap className="w-4 h-4" /> Dica de Auditoria
-                </h4>
-                <p className="text-amber-700 text-xs leading-relaxed">
-                    Se você está falhando em muitos contratos de "Médio Prazo", tente quebrar as tarefas em blocos menores de 30 minutos. Consistência vence intensidade.
-                </p>
-            </div>
-        </div>
-    );
-  };
+          const renderFocus = () => {
+            if (!activeTask) return null;
+            const progress = ((activeTask.duration * 60 - timeLeft) / (activeTask.duration * 60)) * 100;
+            
+            return (
+              <div className="h-full flex flex-col bg-slate-900 text-white p-6 -m-6 sm:m-0 rounded-none sm:rounded-xl relative">
+                <button onClick={() => setView('dashboard')} className="absolute top-6 left-6 text-slate-500 hover:text-white">
+                    &larr; Abortar
+                </button>
+                
+                <div className="flex-1 flex flex-col items-center justify-start mt-12">
+                    <h2 className="text-xl font-bold text-center mb-1">{activeTask.title}</h2>
+                    {activeTask.parentId && (
+                        <p className="text-slate-500 text-xs mb-8">
+                           Etapa para: {tasks.find(t => t.id === activeTask.parentId)?.title}
+                        </p>
+                    )}
 
-  const renderTaskManager = () => {
-    // Mapa de Objetivos
-    return (
-        <div className="space-y-6 pb-20">
-             <header className="flex items-center gap-2">
-                <button onClick={() => setView('dashboard')} className="text-sm text-slate-500 hover:text-slate-800">&larr; Voltar</button>
-                <h2 className="font-bold text-slate-800">Mapa de Objetivos</h2>
-            </header>
+                    <div className="text-8xl font-mono font-light tracking-tighter mb-8 tabular-nums">
+                        {formatTime(timeLeft)}
+                    </div>
 
-            {['long', 'medium', 'short'].map(type => (
-                <div key={type} className="space-y-2">
-                    <h3 className="text-xs font-bold uppercase text-slate-400 flex items-center gap-2">
-                        {type === 'long' ? <Target className="w-3 h-3"/> : type === 'medium' ? <Calendar className="w-3 h-3"/> : <Clock className="w-3 h-3"/>}
-                        {type === 'long' ? 'Longo Prazo' : type === 'medium' ? 'Médio Prazo' : 'Curto Prazo'}
-                    </h3>
-                    {tasks.filter(t => t.type === type && t.status === 'pending').map(task => (
-                        <div key={task.id} className="bg-white p-3 rounded border border-slate-200 flex justify-between items-center group hover:border-slate-400 transition-colors">
-                            <div>
-                                <p className="font-medium text-slate-800">{task.title}</p>
-                                {task.parentId && (
-                                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                                        <ArrowRight className="w-3 h-3" />
-                                        {tasks.find(t => t.id === task.parentId)?.title || 'Pai não encontrado'}
-                                    </p>
-                                )}
+                    <Button 
+                        onClick={() => setIsTimerRunning(!isTimerRunning)} 
+                        className={`w-48 py-4 text-xl rounded-full transition-all duration-300 ${
+                           isTimerRunning ? 'bg-amber-500 hover:bg-amber-600 scale-100' : 'bg-emerald-500 hover:bg-emerald-600 hover:scale-105'
+                        } border-none shadow-[0_0_40px_-10px_rgba(16,185,129,0.5)]`}
+                    >
+                        {isTimerRunning ? 'Pausar' : 'Focar'}
+                    </Button>
+
+                    {/* Distraction Buffer - Feature Analítica */}
+                    <div className="w-full max-w-xs mt-10">
+                        <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase mb-2">
+                            <BrainCircuit className="w-4 h-4" /> Buffer Mental
+                        </label>
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2">
+                            <textarea 
+                                value={distractionBuffer}
+                                onChange={(e) => setDistractionBuffer(e.target.value)}
+                                placeholder="Pensou em algo? Anote aqui e tire da cabeça. Não saia da tela."
+                                className="w-full bg-transparent text-sm text-slate-300 placeholder:text-slate-600 focus:outline-none resize-none h-20"
+                            />
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-1 text-center">Tire a pendência da mente, coloque no buffer e foque.</p>
+                    </div>
+                </div>
+                
+                {timeLeft < (activeTask.duration * 60) && (
+                    <div className="mt-auto mb-6 flex justify-center gap-4">
+                        <button onClick={completeActiveTask} className="text-emerald-500 hover:text-emerald-400 text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5" /> Concluir Contrato
+                        </button>
+                    </div>
+                )}
+              </div>
+            );
+          };
+
+          const renderAnalytics = () => {
+            const weeklyData = getWeeklyData();
+            const maxMinutes = Math.max(...weeklyData.map(d => d.minutes), 60); // escala mínima de 60
+            
+            // Cálculo de horas totais
+            const totalMinutes = tasks.filter(t => t.status === 'completed').reduce((acc, t) => acc + (t.duration || 0), 0);
+            const totalHours = (totalMinutes / 60).toFixed(1);
+
+            return (
+                <div className="space-y-6 pb-20 animate-in fade-in slide-in-from-right-4">
+                     <header className="flex items-center gap-2">
+                        <button onClick={() => setView('dashboard')} className="text-sm text-slate-500 hover:text-slate-800">&larr; Voltar</button>
+                        <h2 className="font-bold text-slate-800">Auditoria de Resultados</h2>
+                    </header>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <Card className="p-4 bg-slate-900 text-white border-none">
+                            <div className="text-xs text-slate-400 uppercase font-bold mb-1">Horas Líquidas</div>
+                            <div className="text-3xl font-mono">{totalHours}h</div>
+                            <div className="text-[10px] text-slate-500 mt-1">Acumulado Total</div>
+                        </Card>
+                        <Card className="p-4">
+                            <div className="text-xs text-slate-500 uppercase font-bold mb-1">Contratos</div>
+                            <div className="text-3xl font-mono text-emerald-600">
+                                {tasks.filter(t => t.status === 'completed').length}
                             </div>
-                            <button onClick={() => setTasks(tasks.filter(t => t.id !== task.id))} className="text-slate-300 hover:text-red-500 p-2">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="text-[10px] text-slate-400 mt-1">Executados com sucesso</div>
+                        </Card>
+                    </div>
+
+                    <Card className="p-6">
+                        <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2">
+                            <BarChart2 className="w-4 h-4 text-indigo-500" />
+                            Produtividade (Últimos 7 dias)
+                        </h3>
+                        
+                        <div className="flex items-end justify-between h-40 gap-2">
+                            {weeklyData.map((d, i) => {
+                                const heightPct = (d.minutes / maxMinutes) * 100;
+                                const isToday = i === 6;
+                                return (
+                                    <div key={d.date} className="flex-1 flex flex-col items-center group">
+                                        <div className="relative w-full flex items-end justify-center h-full bg-slate-50 rounded-t overflow-hidden">
+                                            <div 
+                                                style={{ height: `${heightPct}%` }} 
+                                                className={`w-full ${isToday ? 'bg-indigo-500' : 'bg-slate-300'} transition-all duration-500 group-hover:bg-indigo-400`}
+                                            ></div>
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 mt-2 font-mono">
+                                            {d.date.split('-')[2]}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </Card>
+
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                        <h4 className="text-amber-800 font-bold text-sm mb-2 flex items-center gap-2">
+                            <Zap className="w-4 h-4" /> Dica de Auditoria
+                        </h4>
+                        <p className="text-amber-700 text-xs leading-relaxed">
+                            Se você está falhando em muitos contratos de "Médio Prazo", tente quebrar as tarefas em blocos menores de 30 minutos. Consistência vence intensidade.
+                        </p>
+                    </div>
+                </div>
+            );
+          };
+
+          const renderTaskManager = () => {
+            // Mapa de Objetivos
+            return (
+                <div className="space-y-6 pb-20">
+                     <header className="flex items-center gap-2">
+                        <button onClick={() => setView('dashboard')} className="text-sm text-slate-500 hover:text-slate-800">&larr; Voltar</button>
+                        <h2 className="font-bold text-slate-800">Mapa de Objetivos</h2>
+                    </header>
+
+                    {['long', 'medium', 'short'].map(type => (
+                        <div key={type} className="space-y-2">
+                            <h3 className="text-xs font-bold uppercase text-slate-400 flex items-center gap-2">
+                                {type === 'long' ? <Target className="w-3 h-3"/> : type === 'medium' ? <Calendar className="w-3 h-3"/> : <Clock className="w-3 h-3"/>}
+                                {type === 'long' ? 'Longo Prazo' : type === 'medium' ? 'Médio Prazo' : 'Curto Prazo'}
+                            </h3>
+                            {tasks.filter(t => t.type === type && t.status === 'pending').map(task => (
+                                <div key={task.id} className="bg-white p-3 rounded border border-slate-200 flex justify-between items-center group hover:border-slate-400 transition-colors">
+                                    <div>
+                                        <p className="font-medium text-slate-800">{task.title}</p>
+                                        {task.parentId && (
+                                            <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                                                <ArrowRight className="w-3 h-3" />
+                                                {tasks.find(t => t.id === task.parentId)?.title || 'Pai não encontrado'}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <button onClick={() => setTasks(tasks.filter(t => t.id !== task.id))} className="text-slate-300 hover:text-red-500 p-2">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                            {tasks.filter(t => t.type === type).length === 0 && (
+                                <div className="p-4 border border-dashed border-slate-300 rounded text-center text-slate-400 text-xs">
+                                    Sem itens aqui
+                                </div>
+                            )}
                         </div>
                     ))}
-                    {tasks.filter(t => t.type === type).length === 0 && (
-                        <div className="p-4 border border-dashed border-slate-300 rounded text-center text-slate-400 text-xs">
-                            Sem itens aqui
+                </div>
+            )
+          }
+
+          const renderModal = () => {
+            if (!isModalOpen) return null;
+
+            if (suggestionFlow) {
+              const suggestions = generateBreakdown(suggestionFlow.parentTitle, suggestionFlow.nextType);
+              return (
+                <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                  <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+                    <div className="p-6 bg-indigo-50 border-b border-indigo-100">
+                      <h3 className="font-bold text-indigo-900 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5" /> Sugestão de Planejamento
+                      </h3>
+                      <p className="text-sm text-indigo-700 mt-1">
+                        Para alcançar <strong>"{suggestionFlow.parentTitle}"</strong>, sugerimos quebrar em metas de {suggestionFlow.nextType === 'medium' ? 'Médio Prazo' : 'Curto Prazo'}:
+                      </p>
+                    </div>
+                    <div className="p-6 space-y-4">
+                      {suggestions.map((s, i) => (
+                        <div key={i} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                          <div className="font-semibold text-sm mb-1">{s.title}</div>
+                          <div className="text-xs text-slate-500 flex gap-3">
+                            <span className="text-emerald-600">Positivo: {s.reward}</span>
+                            <span className="text-red-600">Negativo: {s.penalty}</span>
+                          </div>
                         </div>
-                    )}
-                </div>
-            ))}
-        </div>
-    )
-  }
-
-  const renderModal = () => {
-    if (!isModalOpen) return null;
-
-    if (suggestionFlow) {
-      const suggestions = generateBreakdown(suggestionFlow.parentTitle, suggestionFlow.nextType);
-      return (
-        <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
-            <div className="p-6 bg-indigo-50 border-b border-indigo-100">
-              <h3 className="font-bold text-indigo-900 flex items-center gap-2">
-                <Sparkles className="w-5 h-5" /> Sugestão de Planejamento
-              </h3>
-              <p className="text-sm text-indigo-700 mt-1">
-                Para alcançar <strong>"{suggestionFlow.parentTitle}"</strong>, sugerimos quebrar em metas de {suggestionFlow.nextType === 'medium' ? 'Médio Prazo' : 'Curto Prazo'}:
-              </p>
-            </div>
-            <div className="p-6 space-y-4">
-              {suggestions.map((s, i) => (
-                <div key={i} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                  <div className="font-semibold text-sm mb-1">{s.title}</div>
-                  <div className="text-xs text-slate-500 flex gap-3">
-                    <span className="text-emerald-600">Positivo: {s.reward}</span>
-                    <span className="text-red-600">Negativo: {s.penalty}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-6 bg-slate-50 flex gap-3 justify-end border-t border-slate-200">
-               <Button variant="ghost" onClick={() => { setSuggestionFlow(null); setIsModalOpen(false); }}>Ignorar</Button>
-               <Button variant="ghost" onClick={() => setSuggestionFlow(null)}>Manual</Button>
-               <Button onClick={() => handleSuggestionAccept(suggestions)} variant="accent"><CheckCircle className="w-4 h-4" /> Aceitar</Button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
-          <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-bold text-lg">Novo Contrato</h3>
-            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900"><XCircle className="w-6 h-6" /></button>
-          </div>
-          <form onSubmit={handleTaskSubmit} className="p-6 space-y-4">
-            <div className="space-y-4">
-               <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Título do Objetivo</label>
-                  <input name="title" autoFocus required placeholder="Ex: Terminar Capítulo 3" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-slate-900 outline-none" />
-               </div>
-               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Horizonte</label>
-                    <div className="relative">
-                      <select name="type" className="w-full p-2 border border-slate-300 rounded appearance-none bg-white">
-                        <option value="short">Curto Prazo (Diário)</option>
-                        <option value="medium">Médio Prazo (Mensal)</option>
-                        <option value="long">Longo Prazo (Visão)</option>
-                      </select>
-                      <Layers className="absolute right-2 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                      ))}
+                    </div>
+                    <div className="p-6 bg-slate-50 flex gap-3 justify-end border-t border-slate-200">
+                       <Button variant="ghost" onClick={() => { setSuggestionFlow(null); setIsModalOpen(false); }}>Ignorar</Button>
+                       <Button variant="ghost" onClick={() => setSuggestionFlow(null)}>Manual</Button>
+                       <Button onClick={() => handleSuggestionAccept(suggestions)} variant="accent"><CheckCircle className="w-4 h-4" /> Aceitar</Button>
                     </div>
                   </div>
-                  <div>
-                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Vinculado a (Opcional)</label>
-                     <select name="parentId" className="w-full p-2 border border-slate-300 rounded bg-white text-sm">
-                        <option value="">Nenhum (Raiz)</option>
-                        {tasks.filter(t => t.type !== 'short').map(t => (
-                           <option key={t.id} value={t.id}>[{t.type === 'long' ? 'Longo' : 'Médio'}] {t.title}</option>
-                        ))}
-                     </select>
+                </div>
+              );
+            }
+
+            return (
+              <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+                  <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="font-bold text-lg">Novo Contrato</h3>
+                    <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900"><XCircle className="w-6 h-6" /></button>
                   </div>
-               </div>
-               <div>
-                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Duração Estimada (Min)</label>
-                   <input name="duration" type="number" defaultValue="45" className="w-full p-2 border border-slate-300 rounded" />
-               </div>
-            </div>
-            <div className="border-t border-slate-100 pt-4 grid grid-cols-1 gap-4">
-              <div className="bg-emerald-50 p-3 rounded border border-emerald-100">
-                <label className="block text-xs font-bold text-emerald-800 uppercase mb-1">Reforço Positivo</label>
-                <input name="reward" required placeholder="Ex: Café especial" className="w-full p-2 bg-white border border-emerald-200 rounded text-sm" />
+                  <form onSubmit={handleTaskSubmit} className="p-6 space-y-4">
+                    <div className="space-y-4">
+                       <div>
+                          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Título do Objetivo</label>
+                          <input name="title" autoFocus required placeholder="Ex: Terminar Capítulo 3" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-slate-900 outline-none" />
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Horizonte</label>
+                            <div className="relative">
+                              <select name="type" className="w-full p-2 border border-slate-300 rounded appearance-none bg-white">
+                                <option value="short">Curto Prazo (Diário)</option>
+                                <option value="medium">Médio Prazo (Mensal)</option>
+                                <option value="long">Longo Prazo (Visão)</option>
+                              </select>
+                              <Layers className="absolute right-2 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                            </div>
+                          </div>
+                          <div>
+                             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Vinculado a (Opcional)</label>
+                             <select name="parentId" className="w-full p-2 border border-slate-300 rounded bg-white text-sm">
+                                <option value="">Nenhum (Raiz)</option>
+                                {tasks.filter(t => t.type !== 'short').map(t => (
+                                   <option key={t.id} value={t.id}>[{t.type === 'long' ? 'Longo' : 'Médio'}] {t.title}</option>
+                                ))}
+                             </select>
+                          </div>
+                       </div>
+                       <div>
+                           <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Duração Estimada (Min)</label>
+                           <input name="duration" type="number" defaultValue="45" className="w-full p-2 border border-slate-300 rounded" />
+                       </div>
+                    </div>
+                    <div className="border-t border-slate-100 pt-4 grid grid-cols-1 gap-4">
+                      <div className="bg-emerald-50 p-3 rounded border border-emerald-100">
+                        <label className="block text-xs font-bold text-emerald-800 uppercase mb-1">Reforço Positivo</label>
+                        <input name="reward" required placeholder="Ex: Café especial" className="w-full p-2 bg-white border border-emerald-200 rounded text-sm" />
+                      </div>
+                      <div className="bg-red-50 p-3 rounded border border-red-100">
+                        <label className="block text-xs font-bold text-red-800 uppercase mb-1">Reforço Negativo</label>
+                        <input name="penalty" required placeholder="Ex: Lavar louça" className="w-full p-2 bg-white border border-red-200 rounded text-sm" />
+                      </div>
+                    </div>
+                    <div className="pt-2">
+                      <Button type="submit" className="w-full">Firmar Contrato</Button>
+                    </div>
+                  </form>
+                </div>
               </div>
-              <div className="bg-red-50 p-3 rounded border border-red-100">
-                <label className="block text-xs font-bold text-red-800 uppercase mb-1">Reforço Negativo</label>
-                <input name="penalty" required placeholder="Ex: Lavar louça" className="w-full p-2 bg-white border border-red-200 rounded text-sm" />
+            );
+          };
+
+          return (
+            <div className="w-full max-w-md h-[850px] bg-white rounded-2xl shadow-2xl overflow-hidden relative border-4 border-slate-900 flex flex-col">
+              
+              {/* Main Content Area */}
+              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+                  {view === 'dashboard' && renderDashboard()}
+                  {view === 'focus' && renderFocus()}
+                  {view === 'tasks' && renderTaskManager()}
+                  {view === 'analytics' && renderAnalytics()}
               </div>
-            </div>
-            <div className="pt-2">
-              <Button type="submit" className="w-full">Firmar Contrato</Button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  };
 
-  return (
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans text-slate-900">
-      <div className="w-full max-w-md h-[850px] bg-white rounded-2xl shadow-2xl overflow-hidden relative border-4 border-slate-900 flex flex-col">
-        
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-            {view === 'dashboard' && renderDashboard()}
-            {view === 'focus' && renderFocus()}
-            {view === 'tasks' && renderTaskManager()}
-            {view === 'analytics' && renderAnalytics()}
-        </div>
+              {/* Bottom Navigation */}
+              {view !== 'focus' && (
+                  <div className="bg-white border-t border-slate-200 p-3 grid grid-cols-4 gap-2">
+                      <button onClick={() => setView('dashboard')} className={`flex flex-col items-center justify-center p-2 rounded ${view === 'dashboard' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
+                          <Target className="w-5 h-5 mb-1" />
+                          <span className="text-[9px] font-bold uppercase">Painel</span>
+                      </button>
+                      <button onClick={() => setView('tasks')} className={`flex flex-col items-center justify-center p-2 rounded ${view === 'tasks' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
+                          <Layers className="w-5 h-5 mb-1" />
+                          <span className="text-[9px] font-bold uppercase">Mapa</span>
+                      </button>
+                      <button onClick={() => setView('analytics')} className={`flex flex-col items-center justify-center p-2 rounded ${view === 'analytics' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
+                          <TrendingUp className="w-5 h-5 mb-1" />
+                          <span className="text-[9px] font-bold uppercase">Audit</span>
+                      </button>
+                      <button onClick={() => setIsModalOpen(true)} className="flex flex-col items-center justify-center p-2 rounded text-emerald-600 hover:bg-emerald-50">
+                          <Plus className="w-5 h-5 mb-1" />
+                          <span className="text-[9px] font-bold uppercase">Novo</span>
+                      </button>
+                  </div>
+              )}
 
-        {/* Bottom Navigation */}
-        {view !== 'focus' && (
-            <div className="bg-white border-t border-slate-200 p-3 grid grid-cols-4 gap-2">
-                <button onClick={() => setView('dashboard')} className={`flex flex-col items-center justify-center p-2 rounded ${view === 'dashboard' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <Target className="w-5 h-5 mb-1" />
-                    <span className="text-[9px] font-bold uppercase">Painel</span>
-                </button>
-                <button onClick={() => setView('tasks')} className={`flex flex-col items-center justify-center p-2 rounded ${view === 'tasks' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <Layers className="w-5 h-5 mb-1" />
-                    <span className="text-[9px] font-bold uppercase">Mapa</span>
-                </button>
-                <button onClick={() => setView('analytics')} className={`flex flex-col items-center justify-center p-2 rounded ${view === 'analytics' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <TrendingUp className="w-5 h-5 mb-1" />
-                    <span className="text-[9px] font-bold uppercase">Audit</span>
-                </button>
-                <button onClick={() => setIsModalOpen(true)} className="flex flex-col items-center justify-center p-2 rounded text-emerald-600 hover:bg-emerald-50">
-                    <Plus className="w-5 h-5 mb-1" />
-                    <span className="text-[9px] font-bold uppercase">Novo</span>
-                </button>
+              {/* Modal Layer */}
+              {renderModal()}
+              
             </div>
-        )}
+          );
+        }
 
-        {/* Modal Layer */}
-        {renderModal()}
-        
-      </div>
-    </div>
-  );
-}
+        const root = createRoot(document.getElementById('root'));
+        root.render(<FocusContractDefinitive />);
+    </script>
+</body>
+</html>
