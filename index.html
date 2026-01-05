@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FocusContract - App do Concurseiro</title>
     
-    <!-- 1. Tailwind CSS para o estilo -->
+    <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 2. Configuração de Imports (Isso permite usar 'import' no navegador) -->
+    <!-- 2. Configuração de Imports -->
     <script type="importmap">
     {
       "imports": {
@@ -19,26 +19,28 @@
     }
     </script>
     
-    <!-- 3. Babel para traduzir o JSX para o navegador -->
+    <!-- 3. Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Estilos extras para scrollbar e animações -->
     <style>
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .animate-enter { animation: enter 0.3s ease-out; }
+        @keyframes enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .pulse-ring {
+            box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7);
+            animation: pulse-ring 2s infinite cubic-bezier(0.66, 0, 0, 1);
         }
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        @keyframes pulse-ring {
+            to { box-shadow: 0 0 0 20px rgba(79, 70, 229, 0); }
         }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen flex items-center justify-center font-sans text-slate-900">
     
-    <!-- Onde o React vai montar o app -->
     <div id="root" class="w-full h-full flex justify-center p-4"></div>
 
-    <!-- 4. Seu Código do App -->
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
@@ -46,26 +48,28 @@
           Play, CheckCircle, XCircle, Target, Clock, BarChart2, 
           ShieldAlert, Trophy, Calendar, Trash2, Plus, ArrowRight, 
           GitMerge, Layers, Sparkles, Zap, BrainCircuit, TrendingUp, 
-          Activity, AlertTriangle 
+          Activity, AlertTriangle, Coffee, BookOpen, Brush, RefreshCcw,
+          Dices, Lock, RotateCcw
         } from 'lucide-react';
 
         // --- Components ---
 
         const Card = ({ children, className = "", onClick }) => (
-          <div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className} ${onClick ? 'cursor-pointer hover:border-slate-400' : ''}`}>
+          <div onClick={onClick} className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className} ${onClick ? 'cursor-pointer hover:border-slate-400 transition-colors' : ''}`}>
             {children}
           </div>
         );
 
         const Button = ({ onClick, children, variant = "primary", className = "", disabled = false, type="button" }) => {
-          const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2";
+          const baseStyle = "px-4 py-3 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:pointer-events-none";
           const variants = {
             primary: "bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-300",
             secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50",
             danger: "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200",
             success: "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200",
             ghost: "text-slate-500 hover:bg-slate-100 border-transparent",
-            accent: "bg-indigo-600 text-white hover:bg-indigo-700 border-transparent"
+            accent: "bg-indigo-600 text-white hover:bg-indigo-700 border-transparent",
+            chore: "bg-orange-500 text-white hover:bg-orange-600 border-transparent"
           };
           
           return (
@@ -80,58 +84,38 @@
           );
         };
 
-        const Badge = ({ children, type }) => {
-          const styles = {
-            long: "bg-purple-100 text-purple-700 border-purple-200",
-            medium: "bg-blue-100 text-blue-700 border-blue-200",
-            short: "bg-amber-100 text-amber-700 border-amber-200"
-          };
-          return (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${styles[type] || styles.short}`}>
-              {children}
-            </span>
-          );
-        };
-
         // --- Main Application ---
 
         function FocusContractDefinitive() {
           // --- State ---
           const [tasks, setTasks] = useState([]);
-          const [view, setView] = useState('dashboard'); // dashboard, tasks, focus, analytics
+          const [view, setView] = useState('dashboard'); 
           const [activeTask, setActiveTask] = useState(null);
+          const [consequenceType, setConsequenceType] = useState(null); 
+          const [isRolling, setIsRolling] = useState(false); 
           
-          // Modal States
           const [isModalOpen, setIsModalOpen] = useState(false);
-          const [suggestionFlow, setSuggestionFlow] = useState(null); 
           
-          // Timer & Focus States
           const [timeLeft, setTimeLeft] = useState(25 * 60);
           const [isTimerRunning, setIsTimerRunning] = useState(false);
           const [distractionBuffer, setDistractionBuffer] = useState("");
           const timerRef = useRef(null);
 
-          // Load from LocalStorage
+          // Load Data
           useEffect(() => {
-            const saved = localStorage.getItem('focus-contract-final');
+            const saved = localStorage.getItem('focus-contract-production-v1');
             if (saved) {
               setTasks(JSON.parse(saved));
             } else {
-              // Seed Data: Exemplo de Concurseiro
-              setTasks([
-                { id: 1, title: 'Aprovação Auditor Fiscal', type: 'long', status: 'pending', reward: 'Viagem Europa', penalty: 'Continuar no CLT', parentId: null, createdAt: new Date().toISOString() },
-                { id: 2, title: 'Fechar Direito Tributário', type: 'medium', status: 'pending', reward: 'Jantar Japonês', penalty: 'Sem Netflix fds', parentId: 1, createdAt: new Date().toISOString() },
-                { id: 3, title: 'Aula 01: Sistema Tributário', type: 'short', status: 'pending', reward: 'Café Premium', penalty: 'Lavar Banheiro', duration: 90, parentId: 2, createdAt: new Date().toISOString() }
-              ]);
+              setTasks([]); // Start fresh
             }
           }, []);
 
-          // Save to LocalStorage
           useEffect(() => {
-            localStorage.setItem('focus-contract-final', JSON.stringify(tasks));
+            localStorage.setItem('focus-contract-production-v1', JSON.stringify(tasks));
           }, [tasks]);
 
-          // Timer Logic
+          // Timer
           useEffect(() => {
             if (isTimerRunning && timeLeft > 0) {
               timerRef.current = setInterval(() => {
@@ -144,290 +128,284 @@
             return () => clearInterval(timerRef.current);
           }, [isTimerRunning, timeLeft]);
 
-          // Format Time
           const formatTime = (seconds) => {
             const mins = Math.floor(seconds / 60);
             const secs = seconds % 60;
             return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
           };
 
-          // --- Logic for Suggestions & Hierarchy ---
-
-          const generateBreakdown = (parentTitle, type) => {
-            if (type === 'medium') {
-              return [
-                { title: `Fechar Teoria de ${parentTitle}`, reward: "Livro Novo", penalty: "Doar R$50" },
-                { title: `Bateria de 500 Questões - ${parentTitle}`, reward: "Cinema", penalty: "Faxina Pesada" }
-              ];
-            }
-            if (type === 'short') {
-              return [
-                { title: `Leitura PDF: ${parentTitle} (P1)`, duration: 50, reward: "15min Redes Sociais", penalty: "Sem café amanhã" },
-                { title: `Resumo + Flashcards: ${parentTitle}`, duration: 30, reward: "Episódio Série", penalty: "Lavar Louça" }
-              ];
-            }
-            return [];
-          };
+          // --- Core Logic ---
 
           const handleTaskSubmit = (e) => {
             e.preventDefault();
             const form = e.target;
+            const type = form.type.value;
+            const category = form.category ? form.category.value : 'noble';
             
             const newTask = {
               id: Date.now(),
               title: form.title.value,
-              type: form.type.value,
+              type: type,
+              category: type === 'short' ? category : 'noble', 
               status: 'pending',
-              reward: form.reward.value,
-              penalty: form.penalty.value,
               duration: parseInt(form.duration?.value) || 0,
               createdAt: new Date().toISOString(),
-              parentId: form.parentId?.value ? parseInt(form.parentId.value) : null
+              parentId: form.parentId?.value ? parseInt(form.parentId.value) : null,
+              attempts: 0 // New field for persistence logic
             };
 
             setTasks([...tasks, newTask]);
-            
-            if (newTask.type === 'long') {
-              setSuggestionFlow({ parentId: newTask.id, parentTitle: newTask.title, nextType: 'medium' });
-            } else if (newTask.type === 'medium') {
-              setSuggestionFlow({ parentId: newTask.id, parentTitle: newTask.title, nextType: 'short' });
-            } else {
-              setIsModalOpen(false);
-              setSuggestionFlow(null);
-            }
-          };
-
-          const handleSuggestionAccept = (suggestions) => {
-            const newTasks = suggestions.map((s, idx) => ({
-              id: Date.now() + idx,
-              title: s.title,
-              type: suggestionFlow.nextType,
-              status: 'pending',
-              reward: s.reward,
-              penalty: s.penalty,
-              duration: s.duration || 0,
-              parentId: suggestionFlow.parentId,
-              createdAt: new Date().toISOString()
-            }));
-            setTasks(prev => [...prev, ...newTasks]);
             setIsModalOpen(false);
-            setSuggestionFlow(null);
           };
 
-          const completeActiveTask = () => {
-              const updated = tasks.map(t => 
-                  t.id === activeTask.id ? {
-                      ...t, 
-                      status: 'completed', 
-                      completedAt: new Date().toISOString(),
-                      actualDuration: activeTask.duration // Armazena duração planejada como realizada para simplificar
-                  } : t
-              );
-              setTasks(updated);
-              setDistractionBuffer(""); // Limpa o buffer mental
-              setView('dashboard');
+          const startTask = (task) => {
+            setActiveTask(task);
+            setTimeLeft(task.duration * 60);
+            setView('focus');
+            setIsTimerRunning(false);
+            setDistractionBuffer("");
           };
 
-          // --- Helpers for Analytics ---
-          
-          const getWeeklyData = () => {
-            const last7Days = Array.from({length: 7}, (_, i) => {
-                const d = new Date();
-                d.setDate(d.getDate() - i);
-                return d.toISOString().split('T')[0];
-            }).reverse();
+          const handleFocusEnd = (wasSuccessful) => {
+            let updatedTasks = [...tasks];
 
-            return last7Days.map(date => {
-                const minutes = tasks
-                    .filter(t => t.status === 'completed' && t.completedAt && t.completedAt.startsWith(date))
-                    .reduce((acc, curr) => acc + (curr.duration || 0), 0);
-                return { date, minutes };
-            });
+            if (wasSuccessful) {
+                // SUCESSO: Marca como completa
+                updatedTasks = updatedTasks.map(t => 
+                    t.id === activeTask.id ? { ...t, status: 'completed', completedAt: new Date().toISOString(), actualDuration: activeTask.duration } : t
+                );
+            } else {
+                // FALHA: Incrementa tentativas, MAS MANTÉM 'PENDING'
+                // A tarefa continua na fila para ser feita novamente
+                updatedTasks = updatedTasks.map(t => 
+                    t.id === activeTask.id ? { ...t, attempts: (t.attempts || 0) + 1 } : t
+                );
+            }
+            
+            setTasks(updatedTasks);
+            
+            // Roteamento para Consequência
+            if (activeTask.category === 'noble') {
+                setConsequenceType(wasSuccessful ? 'success' : 'failure');
+                setView('consequence');
+            } else {
+                // Se completou uma punição ou lazer, volta pro dashboard
+                setView('dashboard');
+            }
+            setIsTimerRunning(false);
+          };
+
+          const deleteTask = (id) => {
+            setTasks(tasks.filter(t => t.id !== id));
+          };
+
+          const rollTask = (type) => {
+             const pool = tasks.filter(t => t.category === type && t.status === 'pending');
+             if (pool.length === 0) {
+                 alert("Banco de atividades vazio! Adicione novas tarefas.");
+                 return;
+             }
+             
+             setIsRolling(true);
+             setTimeout(() => {
+                 const randomIndex = Math.floor(Math.random() * pool.length);
+                 const selected = pool[randomIndex];
+                 setIsRolling(false);
+                 startTask(selected);
+             }, 1500);
           };
 
           // --- Views ---
 
           const renderDashboard = () => {
-            const shorts = tasks.filter(t => t.type === 'short' && t.status === 'pending');
-            const longs = tasks.filter(t => t.type === 'long' && t.status === 'pending');
-            const totalCompleted = tasks.filter(t => t.status === 'completed').length;
+            const nobleTasks = tasks.filter(t => t.type === 'short' && t.category === 'noble' && t.status === 'pending');
+            const pleasureCount = tasks.filter(t => t.category === 'pleasure' && t.status === 'pending').length;
+            const choreCount = tasks.filter(t => t.category === 'chore' && t.status === 'pending').length;
             
+            const currentMission = nobleTasks.length > 0 ? nobleTasks[0] : null;
+            const nextInQueue = nobleTasks.length > 1 ? nobleTasks.slice(1, 3) : [];
+
             return (
-              <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+              <div className="space-y-6 animate-enter pb-20">
                 <header className="flex justify-between items-center">
                   <div>
                     <h1 className="text-2xl font-bold text-slate-900">FocusContract</h1>
-                    <div className="flex items-center gap-2 text-slate-500 text-xs mt-1">
-                        <Activity className="w-3 h-3 text-emerald-500" />
-                        <span>{totalCompleted} contratos cumpridos</span>
-                    </div>
+                    <p className="text-xs text-slate-500">Comando Central</p>
                   </div>
-                  <Button onClick={() => setIsModalOpen(true)} className="bg-slate-900 shadow-lg">
-                    <Plus className="w-4 h-4" /> Novo
+                  <Button onClick={() => setIsModalOpen(true)} className="bg-slate-900 shadow-lg px-3 py-2">
+                    <Plus className="w-4 h-4" />
                   </Button>
                 </header>
 
-                {/* Priority Block */}
-                <div className="bg-slate-900 rounded-xl p-6 text-white shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <Target className="w-32 h-32" />
-                  </div>
-                  
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
-                    <Target className="w-4 h-4" /> Objetivo Imediato
+                {/* Missão Atual */}
+                <div>
+                  <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
+                    <Target className="w-4 h-4 text-indigo-500" /> Objetivo Prioritário
                   </h2>
-
-                  {shorts.length > 0 ? (
-                    <div>
-                      <div className="mb-6">
-                        <h3 className="text-2xl font-bold leading-tight">{shorts[0].title}</h3>
-                        {shorts[0].parentId && (
-                          <div className="flex items-center gap-2 mt-2 text-slate-400 text-xs">
-                             <GitMerge className="w-3 h-3" />
-                             <span>Parte de: {tasks.find(t => t.id === shorts[0].parentId)?.title}</span>
-                          </div>
+                  
+                  {currentMission ? (
+                     <div className="bg-white rounded-2xl p-6 shadow-xl border-2 border-indigo-500 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">
+                            ORDEM DO DIA
+                        </div>
+                        
+                        {/* Indicador de Tentativas (Pressão Psicológica) */}
+                        {currentMission.attempts > 0 && (
+                            <div className="absolute top-0 left-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1 rounded-br-lg flex items-center gap-1">
+                                <RotateCcw className="w-3 h-3" /> TENTATIVA #{currentMission.attempts + 1}
+                            </div>
                         )}
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-3 mb-6">
-                        <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
-                          <span className="text-emerald-400 text-xs font-bold uppercase flex items-center gap-1 mb-1">
-                            <Trophy className="w-3 h-3"/> Ganho
-                          </span>
-                          <p className="text-sm text-slate-200 leading-tight">{shorts[0].reward}</p>
-                        </div>
-                        <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
-                          <span className="text-red-400 text-xs font-bold uppercase flex items-center gap-1 mb-1">
-                            <ShieldAlert className="w-3 h-3"/> Risco
-                          </span>
-                          <p className="text-sm text-slate-200 leading-tight">{shorts[0].penalty}</p>
-                        </div>
-                      </div>
 
-                      <Button onClick={() => { setActiveTask(shorts[0]); setTimeLeft(shorts[0].duration * 60); setView('focus'); }} className="w-full bg-emerald-500 hover:bg-emerald-600 text-white border-none py-3">
-                        <Play className="w-4 h-4 fill-current" /> Executar ({(shorts[0].duration || 30)} min)
-                      </Button>
-                    </div>
+                        <h3 className="text-xl font-bold text-slate-800 mb-2 mt-4">{currentMission.title}</h3>
+                        <div className="flex items-center gap-4 text-sm text-slate-500 mb-6">
+                             <span className="flex items-center gap-1"><Clock className="w-4 h-4"/> {currentMission.duration} min</span>
+                             <span className="flex items-center gap-1 text-indigo-600 font-medium"><BookOpen className="w-4 h-4"/> Estudo</span>
+                        </div>
+                        <Button 
+                            onClick={() => startTask(currentMission)} 
+                            className="w-full py-4 text-lg bg-indigo-600 hover:bg-indigo-700 shadow-lg pulse-ring"
+                        >
+                            <Play className="w-5 h-5 fill-current" /> Iniciar Missão
+                        </Button>
+                     </div>
                   ) : (
-                     <div className="text-center py-6">
-                        <p className="text-slate-300 mb-4">Você está livre de pendências imediatas.</p>
-                        <Button variant="secondary" onClick={() => setView('tasks')} className="mx-auto w-fit bg-slate-800 border-slate-700 text-white hover:bg-slate-700">
-                          Ver Planejamento Global
+                     <div className="p-8 border-2 border-dashed border-slate-300 rounded-xl text-center bg-slate-50">
+                        <p className="text-slate-500 font-medium mb-2">Sem ordens no momento.</p>
+                        <p className="text-xs text-slate-400 mb-4">Adicione suas metas para o sistema gerar a rotina.</p>
+                        <Button variant="secondary" onClick={() => setIsModalOpen(true)} className="text-xs">
+                            <Plus className="w-3 h-3" /> Alimentar o Sistema
                         </Button>
                      </div>
                   )}
                 </div>
 
-                {/* Tree Overview */}
-                <div>
-                  <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-                    <Layers className="w-4 h-4" /> Visão Macro
-                  </h3>
-                  <div className="space-y-4">
-                    {longs.length === 0 && <p className="text-sm text-slate-500 italic">Nenhum objetivo de longo prazo definido.</p>}
-                    {longs.map(long => {
-                      const mediums = tasks.filter(t => t.parentId === long.id);
-                      const progress = Math.round((mediums.filter(m => m.status === 'completed').length / (mediums.length || 1)) * 100);
-                      
-                      return (
-                        <Card key={long.id} className="p-4 border-l-4 border-l-purple-500">
-                          <div className="flex justify-between items-start mb-2">
-                            <h4 className="font-bold text-slate-800">{long.title}</h4>
-                            <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">{progress}%</span>
-                          </div>
-                          
-                          {mediums.length > 0 ? (
-                            <div className="space-y-2 mt-3 pl-3 border-l-2 border-slate-100">
-                              {mediums.map(med => {
-                                const shortTasks = tasks.filter(s => s.parentId === med.id);
-                                const pendingShorts = shortTasks.filter(s => s.status === 'pending').length;
-                                return (
-                                  <div key={med.id} className="text-sm">
-                                    <div className="flex justify-between items-center">
-                                       <span className={`${med.status === 'completed' ? 'line-through text-slate-400' : 'text-slate-700'}`}>
-                                         {med.title}
-                                       </span>
-                                       {pendingShorts > 0 && <Badge type="short">{pendingShorts} ações</Badge>}
+                {/* Fila Bloqueada */}
+                {nextInQueue.length > 0 && (
+                    <div className="opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+                        <h3 className="text-xs font-bold uppercase text-slate-400 mb-2 pl-1 flex items-center gap-2">
+                            <Lock className="w-3 h-3" /> Próximas (Bloqueadas)
+                        </h3>
+                        <div className="space-y-2">
+                            {nextInQueue.map((t, idx) => (
+                                <div key={t.id} className="bg-white p-3 rounded-lg border border-slate-200 flex justify-between items-center text-slate-500">
+                                    <span className="text-sm font-medium truncate">{t.title}</span>
+                                    <div className="flex items-center gap-2">
+                                        {t.attempts > 0 && <span className="text-[10px] text-red-500 font-bold">Falhou {t.attempts}x</span>}
+                                        <span className="text-[10px] bg-slate-100 px-2 py-1 rounded">#{idx + 2}</span>
                                     </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="mt-2">
-                              <Button 
-                                variant="ghost" 
-                                className="text-xs h-8 w-full justify-start pl-0 text-indigo-600 hover:bg-indigo-50"
-                                onClick={() => {
-                                  setSuggestionFlow({ parentId: long.id, parentTitle: long.title, nextType: 'medium' });
-                                  setIsModalOpen(true);
-                                }}
-                              >
-                                <Plus className="w-3 h-3" /> Criar plano de médio prazo
-                              </Button>
-                            </div>
-                          )}
-                        </Card>
-                      );
-                    })}
-                  </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Status dos Bancos */}
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
+                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100 flex flex-col items-center text-center">
+                        <div className="text-emerald-600 font-bold text-xl mb-1">{pleasureCount}</div>
+                        <div className="text-[10px] uppercase font-bold text-emerald-800">Recompensas</div>
+                    </div>
+                    <div className="bg-orange-50 rounded-xl p-3 border border-orange-100 flex flex-col items-center text-center">
+                        <div className="text-orange-600 font-bold text-xl mb-1">{choreCount}</div>
+                        <div className="text-[10px] uppercase font-bold text-orange-800">Manutenção</div>
+                    </div>
                 </div>
               </div>
             );
           };
 
+          const renderTaskManager = () => {
+             return (
+                <div className="space-y-6 pb-20 animate-enter">
+                     <header className="flex items-center gap-2">
+                        <button onClick={() => setView('dashboard')} className="text-sm text-slate-500 hover:text-slate-800">&larr; Voltar</button>
+                        <h2 className="font-bold text-slate-800">Mapa Estratégico</h2>
+                    </header>
+                    {['long', 'medium', 'short'].map(type => (
+                        <div key={type} className="space-y-2">
+                            <h3 className="text-xs font-bold uppercase text-slate-400 flex items-center gap-2">
+                                {type === 'long' ? 'Longo Prazo' : type === 'medium' ? 'Médio Prazo' : 'Curto Prazo'}
+                            </h3>
+                            {tasks.filter(t => t.type === type && t.category === 'noble' && t.status === 'pending').map(task => (
+                                <div key={task.id} className="bg-white p-3 rounded border border-slate-200 flex justify-between items-center">
+                                    <div className="flex-1">
+                                        <p className="font-medium text-slate-800 text-sm">{task.title}</p>
+                                        {task.attempts > 0 && <p className="text-[10px] text-red-500 font-bold mt-1">Falhou {task.attempts} vezes</p>}
+                                    </div>
+                                    <button onClick={() => deleteTask(task.id)} className="text-slate-300 hover:text-red-500 p-2"><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                            ))}
+                            {tasks.filter(t => t.type === type && t.category === 'noble').length === 0 && (
+                                <div className="p-4 border border-dashed border-slate-300 rounded text-center text-slate-400 text-xs">
+                                    Lista vazia.
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    <div className="mt-8 border-t border-slate-200 pt-4">
+                        <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Bancos de Atividades</h3>
+                        <Button variant="secondary" onClick={() => setIsModalOpen(true)} className="w-full text-xs">Adicionar Itens aos Bancos</Button>
+                    </div>
+                </div>
+            )
+          };
+
+          const renderAnalytics = () => {
+             const completedNoble = tasks.filter(t => t.category === 'noble' && t.status === 'completed').length;
+             return (
+                <div className="space-y-6 pb-20 animate-enter">
+                     <header className="flex items-center gap-2">
+                        <button onClick={() => setView('dashboard')} className="text-sm text-slate-500 hover:text-slate-800">&larr; Voltar</button>
+                        <h2 className="font-bold text-slate-800">Auditoria</h2>
+                    </header>
+                    <Card className="p-4"><div className="text-3xl font-mono text-indigo-600">{completedNoble}</div><div className="text-xs text-slate-500">Missões Cumpridas</div></Card>
+                    <p className="text-xs text-slate-400 text-center mt-4">Continue focado. O gráfico detalhado será gerado com mais dados.</p>
+                </div>
+             );
+          };
+
           const renderFocus = () => {
             if (!activeTask) return null;
-            const progress = ((activeTask.duration * 60 - timeLeft) / (activeTask.duration * 60)) * 100;
-            
-            return (
-              <div className="h-full flex flex-col bg-slate-900 text-white p-6 -m-6 sm:m-0 rounded-none sm:rounded-xl relative">
-                <button onClick={() => setView('dashboard')} className="absolute top-6 left-6 text-slate-500 hover:text-white">
-                    &larr; Abortar
-                </button>
-                
-                <div className="flex-1 flex flex-col items-center justify-start mt-12">
-                    <h2 className="text-xl font-bold text-center mb-1">{activeTask.title}</h2>
-                    {activeTask.parentId && (
-                        <p className="text-slate-500 text-xs mb-8">
-                           Etapa para: {tasks.find(t => t.id === activeTask.parentId)?.title}
-                        </p>
-                    )}
+            const theme = activeTask.category === 'noble' ? "bg-slate-900 text-white" : activeTask.category === 'pleasure' ? "bg-emerald-600 text-white" : "bg-orange-600 text-white";
 
-                    <div className="text-8xl font-mono font-light tracking-tighter mb-8 tabular-nums">
+            return (
+              <div className={`h-full flex flex-col ${theme} p-6 -m-6 sm:m-0 rounded-none sm:rounded-xl relative transition-colors duration-500`}>
+                <div className="flex-1 flex flex-col items-center justify-center mt-8">
+                    <div className="mb-4 text-center">
+                        <span className="text-xs font-bold uppercase tracking-widest opacity-70">Em Execução</span>
+                        {activeTask.attempts > 0 && <span className="block text-[10px] font-bold text-red-300 mt-1">TENTATIVA #{activeTask.attempts + 1}</span>}
+                        <h2 className="text-2xl font-bold mt-2 leading-tight">{activeTask.title}</h2>
+                    </div>
+                    
+                    <div className="text-8xl font-mono font-light tracking-tighter my-8 tabular-nums">
                         {formatTime(timeLeft)}
                     </div>
 
-                    <Button 
-                        onClick={() => setIsTimerRunning(!isTimerRunning)} 
-                        className={`w-48 py-4 text-xl rounded-full transition-all duration-300 ${
-                           isTimerRunning ? 'bg-amber-500 hover:bg-amber-600 scale-100' : 'bg-emerald-500 hover:bg-emerald-600 hover:scale-105'
-                        } border-none shadow-[0_0_40px_-10px_rgba(16,185,129,0.5)]`}
-                    >
+                    <Button onClick={() => setIsTimerRunning(!isTimerRunning)} className="w-48 py-4 text-xl rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 shadow-xl">
                         {isTimerRunning ? 'Pausar' : 'Focar'}
                     </Button>
 
-                    {/* Distraction Buffer - Feature Analítica */}
-                    <div className="w-full max-w-xs mt-10">
-                        <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase mb-2">
-                            <BrainCircuit className="w-4 h-4" /> Buffer Mental
-                        </label>
-                        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2">
+                    {activeTask.category === 'noble' && (
+                        <div className="w-full max-w-xs mt-8 opacity-80 hover:opacity-100 transition-opacity">
                             <textarea 
                                 value={distractionBuffer}
                                 onChange={(e) => setDistractionBuffer(e.target.value)}
-                                placeholder="Pensou em algo? Anote aqui e tire da cabeça. Não saia da tela."
-                                className="w-full bg-transparent text-sm text-slate-300 placeholder:text-slate-600 focus:outline-none resize-none h-20"
+                                placeholder="Buffer Mental: Digite distrações aqui..."
+                                className="w-full bg-black/20 text-sm text-white placeholder:text-white/50 focus:outline-none resize-none h-16 rounded p-2 border border-white/10"
                             />
                         </div>
-                        <p className="text-[10px] text-slate-500 mt-1 text-center">Tire a pendência da mente, coloque no buffer e foque.</p>
-                    </div>
+                    )}
                 </div>
                 
                 {timeLeft < (activeTask.duration * 60) && (
-                    <div className="mt-auto mb-6 flex justify-center gap-4">
-                        <button onClick={completeActiveTask} className="text-emerald-500 hover:text-emerald-400 text-sm font-bold uppercase tracking-wider flex items-center gap-2">
-                            <CheckCircle className="w-5 h-5" /> Concluir Contrato
+                    <div className="mt-auto mb-6 flex gap-4 justify-center">
+                        {activeTask.category === 'noble' && (
+                            <button onClick={() => handleFocusEnd(false)} className="flex-1 bg-red-500/20 hover:bg-red-500/40 border border-red-500/50 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2">
+                                <XCircle className="w-5 h-5" /> Falhei
+                            </button>
+                        )}
+                        <button onClick={() => handleFocusEnd(true)} className="flex-[2] bg-white text-slate-900 hover:bg-slate-200 py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-lg">
+                            <CheckCircle className="w-5 h-5" /> Concluir
                         </button>
                     </div>
                 )}
@@ -435,208 +413,118 @@
             );
           };
 
-          const renderAnalytics = () => {
-            const weeklyData = getWeeklyData();
-            const maxMinutes = Math.max(...weeklyData.map(d => d.minutes), 60); // escala mínima de 60
-            
-            // Cálculo de horas totais
-            const totalMinutes = tasks.filter(t => t.status === 'completed').reduce((acc, t) => acc + (t.duration || 0), 0);
-            const totalHours = (totalMinutes / 60).toFixed(1);
-
-            return (
-                <div className="space-y-6 pb-20 animate-in fade-in slide-in-from-right-4">
-                     <header className="flex items-center gap-2">
-                        <button onClick={() => setView('dashboard')} className="text-sm text-slate-500 hover:text-slate-800">&larr; Voltar</button>
-                        <h2 className="font-bold text-slate-800">Auditoria de Resultados</h2>
-                    </header>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <Card className="p-4 bg-slate-900 text-white border-none">
-                            <div className="text-xs text-slate-400 uppercase font-bold mb-1">Horas Líquidas</div>
-                            <div className="text-3xl font-mono">{totalHours}h</div>
-                            <div className="text-[10px] text-slate-500 mt-1">Acumulado Total</div>
-                        </Card>
-                        <Card className="p-4">
-                            <div className="text-xs text-slate-500 uppercase font-bold mb-1">Contratos</div>
-                            <div className="text-3xl font-mono text-emerald-600">
-                                {tasks.filter(t => t.status === 'completed').length}
-                            </div>
-                            <div className="text-[10px] text-slate-400 mt-1">Executados com sucesso</div>
-                        </Card>
+          const renderConsequenceSelection = () => {
+             const isSuccess = consequenceType === 'success';
+             const category = isSuccess ? 'pleasure' : 'chore';
+             
+             return (
+                <div className={`h-full flex flex-col p-6 animate-enter ${isSuccess ? 'bg-emerald-50' : 'bg-orange-50'} -m-6 sm:m-0 rounded-none sm:rounded-xl text-center items-center justify-center`}>
+                    
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${isSuccess ? 'bg-emerald-200 text-emerald-700' : 'bg-orange-200 text-orange-700'}`}>
+                        {isRolling ? <RefreshCcw className="w-8 h-8 animate-spin" /> : <Dices className="w-8 h-8" />}
                     </div>
+                    
+                    <h2 className={`text-2xl font-bold mb-2 ${isSuccess ? 'text-emerald-900' : 'text-orange-900'}`}>
+                        {isRolling ? 'Sorteando...' : (isSuccess ? 'Hora da Recompensa' : 'Hora de Pagar')}
+                    </h2>
+                    
+                    <p className={`text-sm mb-8 max-w-xs ${isSuccess ? 'text-emerald-700' : 'text-orange-800'}`}>
+                        {isSuccess 
+                            ? 'O sistema vai escolher uma atividade do seu banco de lazer.' 
+                            : 'O sistema vai definir sua tarefa de manutenção.'}
+                    </p>
 
-                    <Card className="p-6">
-                        <h3 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2">
-                            <BarChart2 className="w-4 h-4 text-indigo-500" />
-                            Produtividade (Últimos 7 dias)
-                        </h3>
-                        
-                        <div className="flex items-end justify-between h-40 gap-2">
-                            {weeklyData.map((d, i) => {
-                                const heightPct = (d.minutes / maxMinutes) * 100;
-                                const isToday = i === 6;
-                                return (
-                                    <div key={d.date} className="flex-1 flex flex-col items-center group">
-                                        <div className="relative w-full flex items-end justify-center h-full bg-slate-50 rounded-t overflow-hidden">
-                                            <div 
-                                                style={{ height: `${heightPct}%` }} 
-                                                className={`w-full ${isToday ? 'bg-indigo-500' : 'bg-slate-300'} transition-all duration-500 group-hover:bg-indigo-400`}
-                                            ></div>
-                                        </div>
-                                        <div className="text-[10px] text-slate-500 mt-2 font-mono">
-                                            {d.date.split('-')[2]}
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </Card>
-
-                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-                        <h4 className="text-amber-800 font-bold text-sm mb-2 flex items-center gap-2">
-                            <Zap className="w-4 h-4" /> Dica de Auditoria
-                        </h4>
-                        <p className="text-amber-700 text-xs leading-relaxed">
-                            Se você está falhando em muitos contratos de "Médio Prazo", tente quebrar as tarefas em blocos menores de 30 minutos. Consistência vence intensidade.
-                        </p>
-                    </div>
+                    <Button 
+                        onClick={() => rollTask(category)} 
+                        disabled={isRolling}
+                        className={`w-full max-w-xs py-4 text-lg shadow-xl ${isSuccess ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+                    >
+                        {isRolling ? '...' : 'Sortear Atividade'}
+                    </Button>
+                    
+                    {!isRolling && (
+                        <button onClick={() => setView('dashboard')} className="mt-6 text-xs text-slate-400 hover:text-slate-600 underline">
+                            Pular (Não recomendado)
+                        </button>
+                    )}
                 </div>
-            );
-          };
-
-          const renderTaskManager = () => {
-            // Mapa de Objetivos
-            return (
-                <div className="space-y-6 pb-20">
-                     <header className="flex items-center gap-2">
-                        <button onClick={() => setView('dashboard')} className="text-sm text-slate-500 hover:text-slate-800">&larr; Voltar</button>
-                        <h2 className="font-bold text-slate-800">Mapa de Objetivos</h2>
-                    </header>
-
-                    {['long', 'medium', 'short'].map(type => (
-                        <div key={type} className="space-y-2">
-                            <h3 className="text-xs font-bold uppercase text-slate-400 flex items-center gap-2">
-                                {type === 'long' ? <Target className="w-3 h-3"/> : type === 'medium' ? <Calendar className="w-3 h-3"/> : <Clock className="w-3 h-3"/>}
-                                {type === 'long' ? 'Longo Prazo' : type === 'medium' ? 'Médio Prazo' : 'Curto Prazo'}
-                            </h3>
-                            {tasks.filter(t => t.type === type && t.status === 'pending').map(task => (
-                                <div key={task.id} className="bg-white p-3 rounded border border-slate-200 flex justify-between items-center group hover:border-slate-400 transition-colors">
-                                    <div>
-                                        <p className="font-medium text-slate-800">{task.title}</p>
-                                        {task.parentId && (
-                                            <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                                                <ArrowRight className="w-3 h-3" />
-                                                {tasks.find(t => t.id === task.parentId)?.title || 'Pai não encontrado'}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <button onClick={() => setTasks(tasks.filter(t => t.id !== task.id))} className="text-slate-300 hover:text-red-500 p-2">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
-                            {tasks.filter(t => t.type === type).length === 0 && (
-                                <div className="p-4 border border-dashed border-slate-300 rounded text-center text-slate-400 text-xs">
-                                    Sem itens aqui
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )
+             )
           }
 
           const renderModal = () => {
             if (!isModalOpen) return null;
 
-            if (suggestionFlow) {
-              const suggestions = generateBreakdown(suggestionFlow.parentTitle, suggestionFlow.nextType);
-              return (
-                <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                  <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
-                    <div className="p-6 bg-indigo-50 border-b border-indigo-100">
-                      <h3 className="font-bold text-indigo-900 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5" /> Sugestão de Planejamento
-                      </h3>
-                      <p className="text-sm text-indigo-700 mt-1">
-                        Para alcançar <strong>"{suggestionFlow.parentTitle}"</strong>, sugerimos quebrar em metas de {suggestionFlow.nextType === 'medium' ? 'Médio Prazo' : 'Curto Prazo'}:
-                      </p>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      {suggestions.map((s, i) => (
-                        <div key={i} className="border border-slate-200 rounded-lg p-3 bg-slate-50">
-                          <div className="font-semibold text-sm mb-1">{s.title}</div>
-                          <div className="text-xs text-slate-500 flex gap-3">
-                            <span className="text-emerald-600">Positivo: {s.reward}</span>
-                            <span className="text-red-600">Negativo: {s.penalty}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="p-6 bg-slate-50 flex gap-3 justify-end border-t border-slate-200">
-                       <Button variant="ghost" onClick={() => { setSuggestionFlow(null); setIsModalOpen(false); }}>Ignorar</Button>
-                       <Button variant="ghost" onClick={() => setSuggestionFlow(null)}>Manual</Button>
-                       <Button onClick={() => handleSuggestionAccept(suggestions)} variant="accent"><CheckCircle className="w-4 h-4" /> Aceitar</Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
             return (
-              <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
-                  <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="font-bold text-lg">Novo Contrato</h3>
+              <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-enter">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+                  
+                  <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+                    <h3 className="font-bold text-lg text-slate-800">Nova Atividade</h3>
                     <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900"><XCircle className="w-6 h-6" /></button>
                   </div>
-                  <form onSubmit={handleTaskSubmit} className="p-6 space-y-4">
-                    <div className="space-y-4">
-                       <div>
-                          <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Título do Objetivo</label>
-                          <input name="title" autoFocus required placeholder="Ex: Terminar Capítulo 3" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-slate-900 outline-none" />
-                       </div>
-                       <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Horizonte</label>
-                            <div className="relative">
-                              <select name="type" className="w-full p-2 border border-slate-300 rounded appearance-none bg-white">
-                                <option value="short">Curto Prazo (Diário)</option>
-                                <option value="medium">Médio Prazo (Mensal)</option>
-                                <option value="long">Longo Prazo (Visão)</option>
-                              </select>
-                              <Layers className="absolute right-2 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+                  
+                  <div className="overflow-y-auto p-6">
+                      <form onSubmit={handleTaskSubmit} className="space-y-5">
+                        
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Qual o tipo da atividade?</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                 <label className="cursor-pointer">
+                                    <input type="radio" name="type" value="short" defaultChecked className="peer sr-only" onChange={(e) => {
+                                        document.getElementById('category-section').style.display = 'block';
+                                    }}/>
+                                    <div className="p-3 rounded-lg border border-slate-200 text-center peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 hover:bg-slate-50 transition-all">
+                                        <Clock className="w-5 h-5 mx-auto mb-1" />
+                                        <span className="text-xs font-bold">Tarefa (Dia)</span>
+                                    </div>
+                                 </label>
+                                 <label className="cursor-pointer">
+                                    <input type="radio" name="type" value="medium" className="peer sr-only" onChange={(e) => {
+                                        document.getElementById('category-section').style.display = 'none';
+                                    }}/>
+                                    <div className="p-3 rounded-lg border border-slate-200 text-center peer-checked:bg-purple-600 peer-checked:text-white peer-checked:border-purple-600 hover:bg-purple-50 transition-all">
+                                        <Calendar className="w-5 h-5 mx-auto mb-1" />
+                                        <span className="text-xs font-bold">Meta (Mês)</span>
+                                    </div>
+                                 </label>
+                                 <label className="cursor-pointer">
+                                    <input type="radio" name="type" value="long" className="peer sr-only" onChange={(e) => {
+                                        document.getElementById('category-section').style.display = 'none';
+                                    }}/>
+                                    <div className="p-3 rounded-lg border border-slate-200 text-center peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 hover:bg-indigo-50 transition-all">
+                                        <Target className="w-5 h-5 mx-auto mb-1" />
+                                        <span className="text-xs font-bold">Sonho (Longo)</span>
+                                    </div>
+                                 </label>
                             </div>
-                          </div>
-                          <div>
-                             <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Vinculado a (Opcional)</label>
-                             <select name="parentId" className="w-full p-2 border border-slate-300 rounded bg-white text-sm">
-                                <option value="">Nenhum (Raiz)</option>
-                                {tasks.filter(t => t.type !== 'short').map(t => (
-                                   <option key={t.id} value={t.id}>[{t.type === 'long' ? 'Longo' : 'Médio'}] {t.title}</option>
-                                ))}
-                             </select>
-                          </div>
-                       </div>
-                       <div>
-                           <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Duração Estimada (Min)</label>
-                           <input name="duration" type="number" defaultValue="45" className="w-full p-2 border border-slate-300 rounded" />
-                       </div>
-                    </div>
-                    <div className="border-t border-slate-100 pt-4 grid grid-cols-1 gap-4">
-                      <div className="bg-emerald-50 p-3 rounded border border-emerald-100">
-                        <label className="block text-xs font-bold text-emerald-800 uppercase mb-1">Reforço Positivo</label>
-                        <input name="reward" required placeholder="Ex: Café especial" className="w-full p-2 bg-white border border-emerald-200 rounded text-sm" />
-                      </div>
-                      <div className="bg-red-50 p-3 rounded border border-red-100">
-                        <label className="block text-xs font-bold text-red-800 uppercase mb-1">Reforço Negativo</label>
-                        <input name="penalty" required placeholder="Ex: Lavar louça" className="w-full p-2 bg-white border border-red-200 rounded text-sm" />
-                      </div>
-                    </div>
-                    <div className="pt-2">
-                      <Button type="submit" className="w-full">Firmar Contrato</Button>
-                    </div>
-                  </form>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Título</label>
+                            <input name="title" autoFocus required placeholder="Ex: Ler PDF 01, Lavar Carro, Ver Série..." className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 outline-none transition-all" />
+                        </div>
+
+                        <div id="category-section" className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Categoria (Para Tarefas do Dia)</label>
+                                <select name="category" className="w-full p-3 border border-slate-300 rounded-lg bg-white focus:ring-2 focus:ring-slate-900 outline-none">
+                                    <option value="noble">🏆 Nobre (Estudo, Trabalho, Meta Principal)</option>
+                                    <option value="pleasure">🎉 Lazer (Recompensa, Descanso, Hobby)</option>
+                                    <option value="chore">🧹 Manutenção (Obrigação, Limpeza, Punição)</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Duração (Min)</label>
+                               <input name="duration" type="number" defaultValue="30" className="w-full p-3 border border-slate-300 rounded-lg" />
+                            </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <Button type="submit" className="w-full shadow-lg">Adicionar ao Banco</Button>
+                        </div>
+                      </form>
+                  </div>
                 </div>
               </div>
             );
@@ -645,39 +533,35 @@
           return (
             <div className="w-full max-w-md h-[850px] bg-white rounded-2xl shadow-2xl overflow-hidden relative border-4 border-slate-900 flex flex-col">
               
-              {/* Main Content Area */}
-              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
+              <div className="flex-1 overflow-y-auto p-6 scrollbar-hide bg-slate-50/50">
                   {view === 'dashboard' && renderDashboard()}
-                  {view === 'focus' && renderFocus()}
                   {view === 'tasks' && renderTaskManager()}
                   {view === 'analytics' && renderAnalytics()}
+                  {view === 'focus' && renderFocus()}
+                  {view === 'consequence' && renderConsequenceSelection()}
               </div>
 
-              {/* Bottom Navigation */}
-              {view !== 'focus' && (
+              {view !== 'focus' && view !== 'consequence' && (
                   <div className="bg-white border-t border-slate-200 p-3 grid grid-cols-4 gap-2">
-                      <button onClick={() => setView('dashboard')} className={`flex flex-col items-center justify-center p-2 rounded ${view === 'dashboard' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <button onClick={() => setView('dashboard')} className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${view === 'dashboard' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
                           <Target className="w-5 h-5 mb-1" />
-                          <span className="text-[9px] font-bold uppercase">Painel</span>
+                          <span className="text-[9px] font-bold uppercase">Ciclo</span>
                       </button>
-                      <button onClick={() => setView('tasks')} className={`flex flex-col items-center justify-center p-2 rounded ${view === 'tasks' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <button onClick={() => setView('tasks')} className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${view === 'tasks' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
                           <Layers className="w-5 h-5 mb-1" />
                           <span className="text-[9px] font-bold uppercase">Mapa</span>
                       </button>
-                      <button onClick={() => setView('analytics')} className={`flex flex-col items-center justify-center p-2 rounded ${view === 'analytics' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
+                      <button onClick={() => setView('analytics')} className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${view === 'analytics' ? 'text-slate-900 bg-slate-100' : 'text-slate-400 hover:text-slate-600'}`}>
                           <TrendingUp className="w-5 h-5 mb-1" />
                           <span className="text-[9px] font-bold uppercase">Audit</span>
                       </button>
-                      <button onClick={() => setIsModalOpen(true)} className="flex flex-col items-center justify-center p-2 rounded text-emerald-600 hover:bg-emerald-50">
+                      <button onClick={() => setIsModalOpen(true)} className="flex flex-col items-center justify-center p-2 rounded-lg text-indigo-600 bg-indigo-50 hover:bg-indigo-100">
                           <Plus className="w-5 h-5 mb-1" />
                           <span className="text-[9px] font-bold uppercase">Novo</span>
                       </button>
                   </div>
               )}
-
-              {/* Modal Layer */}
               {renderModal()}
-              
             </div>
           );
         }
